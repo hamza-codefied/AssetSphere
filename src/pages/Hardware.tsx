@@ -3,9 +3,11 @@ import { Card, Badge, Button, Modal, CredentialField, CustomSelect } from '../co
 import { Plus, Monitor, HardDrive, MoreVertical, ShieldOff, Trash2 } from 'lucide-react';
 import type { HardwareAsset } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
+import { useAuth } from '../auth/AuthContext';
 
 export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
   const { hardware, employees, addHardware, updateHardware, deleteHardware } = state;
+  const { can } = useAuth();
   const [selectedAsset, setSelectedAsset] = useState<HardwareAsset | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
@@ -50,10 +52,12 @@ export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }
           <h1 className="text-3xl font-bold tracking-tight">Hardware</h1>
           <p className="text-muted-foreground">Manage physical company assets and devices.</p>
         </div>
-        <Button onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
-          <Plus className="w-4 h-4" />
-          Add New Asset
-        </Button>
+        {can('hardware.create') && (
+          <Button onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
+            <Plus className="w-4 h-4" />
+            Add New Asset
+          </Button>
+        )}
       </div>
 
       <Card className="p-0 overflow-hidden">
@@ -194,9 +198,11 @@ export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }
 
 
             <div className="flex gap-3 pt-4">
-              <Button variant="danger" className="flex-1" onClick={() => { deleteHardware(selectedAsset.id); setIsModalOpen(false); }}>
-                <Trash2 className="w-4 h-4" /> Delete Asset
-              </Button>
+              {can('hardware.delete') && (
+                <Button variant="danger" className="flex-1" onClick={() => { deleteHardware(selectedAsset.id); setIsModalOpen(false); }}>
+                  <Trash2 className="w-4 h-4" /> Delete Asset
+                </Button>
+              )}
               <Button variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Close</Button>
             </div>
           </div>

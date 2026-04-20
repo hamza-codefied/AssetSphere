@@ -1,4 +1,6 @@
 import React from 'react';
+import { useAuth } from '../../auth/AuthContext';
+import type { Permission } from '../../auth/permissions';
 import { 
   LayoutDashboard, 
   Monitor, 
@@ -47,15 +49,19 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ activeTab, setActiveTab, collapsed }: SidebarProps) => {
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'hardware', label: 'Hardware', icon: Monitor },
-    { id: 'tools', label: 'Tools & Platforms', icon: ExternalLink },
-    { id: 'accounts', label: 'Central Accounts', icon: ShieldCheck },
-    { id: 'employees', label: 'Employees', icon: Users },
-    { id: 'vault', label: 'Credential Vault', icon: Key },
-    { id: 'guide', label: 'User Guide', icon: BookOpen },
+  const { can, logout } = useAuth();
+
+  const allMenuItems: { id: string; label: string; icon: React.ElementType; permission: Permission }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
+    { id: 'hardware', label: 'Hardware', icon: Monitor, permission: 'hardware.view' },
+    { id: 'tools', label: 'Tools & Platforms', icon: ExternalLink, permission: 'tools.view' },
+    { id: 'accounts', label: 'Central Accounts', icon: ShieldCheck, permission: 'accounts.view' },
+    { id: 'employees', label: 'Employees', icon: Users, permission: 'employees.view' },
+    { id: 'vault', label: 'Credential Vault', icon: Key, permission: 'vault.view' },
+    { id: 'guide', label: 'User Guide', icon: BookOpen, permission: 'guide.view' },
   ];
+
+  const menuItems = allMenuItems.filter(item => can(item.permission));
 
 
 
@@ -95,7 +101,7 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed }: SidebarProps) =>
         <SidebarItem
           icon={LogOut}
           label="Logout"
-          onClick={() => console.log('Logout')}
+          onClick={logout}
           collapsed={collapsed}
         />
       </div>

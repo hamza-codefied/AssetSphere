@@ -4,9 +4,11 @@ import { Card, Badge, Button, Modal, CustomSelect } from '../components/ui';
 import { Plus, ExternalLink, Link as LinkIcon, User, Info, Search, Trash2 } from 'lucide-react';
 import type { SoftwareTool } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
+import { useAuth } from '../auth/AuthContext';
 
 export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
   const { tools, accounts, employees, addTool, updateTool, deleteTool } = state;
+  const { can } = useAuth();
   const [selectedTool, setSelectedTool] = useState<SoftwareTool | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
@@ -39,10 +41,12 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
           <h1 className="text-3xl font-bold tracking-tight">Software & Tools</h1>
           <p className="text-muted-foreground">Manage SaaS subscriptions and platform access.</p>
         </div>
-        <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
-          <Plus className="w-4 h-4" />
-          Add Tool / Platform
-        </Button>
+        {can('tools.create') && (
+          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
+            <Plus className="w-4 h-4" />
+            Add Tool / Platform
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-3 bg-card p-2 rounded-2xl border shadow-subtle">
@@ -178,9 +182,11 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
 
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Close</Button>
-              <Button variant="danger" className="flex-1" onClick={() => { deleteTool(selectedTool.id); setIsModalOpen(false); }}>
-                 <Trash2 className="w-4 h-4" /> Remove Tool
-              </Button>
+              {can('tools.delete') && (
+                <Button variant="danger" className="flex-1" onClick={() => { deleteTool(selectedTool.id); setIsModalOpen(false); }}>
+                   <Trash2 className="w-4 h-4" /> Remove Tool
+                </Button>
+              )}
             </div>
           </div>
         ) : null}

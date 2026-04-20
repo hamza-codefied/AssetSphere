@@ -3,9 +3,11 @@ import { Card, Badge, Button, Modal, CredentialField, CustomSelect } from '../co
 import { ShieldCheck, Mail, Cloud, Globe, ExternalLink, ShieldAlert, Key, Trash2 } from 'lucide-react';
 import type { Account } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
+import { useAuth } from '../auth/AuthContext';
 
 export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
   const { accounts, tools, addAccount, deleteAccount } = state;
+  const { can } = useAuth();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
@@ -54,10 +56,12 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
           <h1 className="text-3xl font-bold tracking-tight">Central Accounts</h1>
           <p className="text-muted-foreground">The core identity system. Create accounts here to link them to tools.</p>
         </div>
-        <Button className="bg-violet-600 hover:bg-violet-700" onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
-          <Key className="w-4 h-4" />
-          Create Central Account
-        </Button>
+        {can('accounts.create') && (
+          <Button className="bg-violet-600 hover:bg-violet-700" onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
+            <Key className="w-4 h-4" />
+            Create Central Account
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -168,9 +172,11 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
             </div>
 
             <div className="pt-4 flex gap-3">
-              <Button variant="danger" className="flex-1" onClick={() => { deleteAccount(selectedAccount.id); setIsModalOpen(false); }}>
-                <Trash2 className="w-4 h-4" /> Delete Account
-              </Button>
+              {can('accounts.delete') && (
+                <Button variant="danger" className="flex-1" onClick={() => { deleteAccount(selectedAccount.id); setIsModalOpen(false); }}>
+                  <Trash2 className="w-4 h-4" /> Delete Account
+                </Button>
+              )}
               <Button variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Close</Button>
             </div>
           </div>

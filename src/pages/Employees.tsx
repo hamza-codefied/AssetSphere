@@ -4,9 +4,11 @@ import { UserPlus, Briefcase, ChevronRight } from 'lucide-react';
 
 import type { Employee } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
+import { useAuth } from '../auth/AuthContext';
 
 export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
   const { employees, hardware, tools, addEmployee, updateEmployee } = state;
+  const { can } = useAuth();
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
@@ -41,10 +43,12 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
           <h1 className="text-3xl font-bold tracking-tight">Employees</h1>
           <p className="text-muted-foreground">Directory of team members and their assigned resources.</p>
         </div>
-        <Button onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
-          <UserPlus className="w-4 h-4" />
-          Onboard Employee
-        </Button>
+        {can('employees.create') && (
+          <Button onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
+            <UserPlus className="w-4 h-4" />
+            Onboard Employee
+          </Button>
+        )}
       </div>
 
       <Card className="p-0 overflow-hidden shadow-premium">
@@ -187,16 +191,18 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
 
             <div className="flex gap-3 pt-4 border-t">
               <Button variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Close</Button>
-              <Button 
-                variant={selectedEmployee.status === 'Active' ? 'danger' : 'success'} 
-                className="flex-1"
-                onClick={() => {
-                  updateEmployee(selectedEmployee.id, { status: selectedEmployee.status === 'Active' ? 'Inactive' : 'Active' });
-                  setIsModalOpen(false);
-                }}
-              >
-                {selectedEmployee.status === 'Active' ? 'Deactivate' : 'Activate'}
-              </Button>
+              {can('employees.deactivate') && (
+                <Button 
+                  variant={selectedEmployee.status === 'Active' ? 'danger' : 'success'} 
+                  className="flex-1"
+                  onClick={() => {
+                    updateEmployee(selectedEmployee.id, { status: selectedEmployee.status === 'Active' ? 'Inactive' : 'Active' });
+                    setIsModalOpen(false);
+                  }}
+                >
+                  {selectedEmployee.status === 'Active' ? 'Deactivate' : 'Activate'}
+                </Button>
+              )}
             </div>
           </div>
         ) : null}
