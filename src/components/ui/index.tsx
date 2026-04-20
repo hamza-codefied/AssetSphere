@@ -1,0 +1,185 @@
+import React, { useState } from 'react';
+import { Eye, EyeOff, Copy, Check, ChevronDown } from 'lucide-react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+export const Card = ({ children, className, onClick }: { children: React.ReactNode; className?: string; onClick?: () => void }) => (
+  <div className={cn("premium-card p-6", className)} onClick={onClick}>
+    {children}
+  </div>
+);
+
+export const Badge = ({ variant = 'default', children, className }: { variant?: 'default' | 'success' | 'warning' | 'danger' | 'info'; children: React.ReactNode, className?: string }) => {
+  const variants = {
+    default: "bg-muted text-muted-foreground",
+    success: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    warning: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    danger: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+    info: "bg-blue-500/10 text-blue-600 border-blue-500/20"
+  };
+  
+  return (
+    <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold border inline-flex items-center", variants[variant], className)}>
+      {children}
+    </span>
+  );
+};
+
+export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'success' | 'outline' | 'ghost' | 'danger' }>(
+  ({ className, variant = 'primary', ...props }, ref) => {
+    const variants = {
+      primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+      secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+      success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
+      outline: "border bg-transparent hover:bg-accent hover:text-accent-foreground",
+      ghost: "hover:bg-accent hover:text-accent-foreground",
+      danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+    };
+    
+    return (
+      <button
+        ref={ref}
+        className={cn(
+          "inline-flex items-center justify-center rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 px-4 py-2 gap-2",
+          variants[variant],
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
+
+export const CredentialField = ({ label, value, isMasked = true }: { label: string; value: string; type?: string; isMasked?: boolean }) => {
+  const [visible, setVisible] = useState(!isMasked);
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="space-y-1.5 group">
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</label>
+      <div className="flex items-center gap-2 bg-accent/50 p-2.5 rounded-xl border border-transparent group-hover:border-border transition-all">
+        <input
+          type={visible ? 'text' : 'password'}
+          value={value}
+          readOnly
+          className="bg-transparent border-none focus:ring-0 text-sm font-mono flex-1 p-0"
+        />
+        <div className="flex items-center gap-1">
+          {isMasked && (
+            <button onClick={() => setVisible(!visible)} className="p-1 hover:bg-white/10 rounded-md text-muted-foreground transition-colors">
+              {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          )}
+          <button onClick={copy} className="p-1 hover:bg-white/10 rounded-md text-muted-foreground transition-colors">
+            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const CustomSelect = <T extends string | number>({ 
+  value, 
+  onChange, 
+  options, 
+  placeholder = "Select option...",
+  className 
+}: { 
+  value: T; 
+  onChange: (value: T) => void; 
+  options: { value: T; label: string }[];
+  placeholder?: string;
+  className?: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = options.find(o => o.value === value);
+
+  return (
+    <div className={cn("relative w-full", className)}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between bg-accent/50 hover:bg-accent border rounded-xl px-4 py-2.5 text-sm font-medium transition-all focus:ring-2 focus:ring-primary/20 outline-none"
+      >
+        <span className={cn(!selectedOption && "text-muted-foreground")}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <div className={cn("transition-transform duration-200", isOpen && "rotate-180")}>
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        </div>
+      </button>
+
+      {/* Backdrop for closing */}
+      {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />}
+      
+      <div
+        className={cn(
+          "absolute left-0 right-0 z-50 overflow-hidden bg-card border rounded-2xl shadow-xl max-h-64 overflow-y-auto premium-card custom-scrollbar dropdown-content",
+          isOpen && "dropdown-content-open"
+        )}
+      >
+        <div className="p-1">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={cn(
+                "w-full flex items-center justify-between px-3 py-2 text-sm rounded-xl transition-colors",
+                value === option.value 
+                  ? "bg-primary text-primary-foreground font-bold" 
+                  : "hover:bg-accent text-foreground"
+              )}
+            >
+              <span>{option.label}</span>
+              {value === option.value && <Check className="w-3.5 h-3.5" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div 
+        className="absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity" 
+        onClick={onClose} 
+      />
+      
+      <div className="bg-card text-card-foreground p-8 rounded-3xl border shadow-2xl w-full max-w-lg relative z-50 premium-card h-auto overflow-visible animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">{title}</h2>
+          <button onClick={onClose} className="p-2 hover:bg-accent rounded-xl transition-colors">
+            <span className="sr-only">Close</span>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="overflow-visible min-h-0">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
