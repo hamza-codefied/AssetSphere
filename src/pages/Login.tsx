@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button } from '../components/ui';
-import { Eye, EyeOff, Shield, AlertCircle } from 'lucide-react';
+import { Button, PasswordInput } from '../components/ui';
+import { Shield, AlertCircle } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { roleConfig, mockUsers } from '../auth/permissions';
 import type { UserRole } from '../auth/permissions';
@@ -9,7 +9,6 @@ export const Login = () => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -142,23 +141,13 @@ export const Login = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full bg-accent/50 border rounded-xl px-4 py-3 text-sm pr-12 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+              <PasswordInput
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full bg-accent/50 border rounded-xl px-4 py-3 text-sm pr-12 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
+                required
+              />
             </div>
 
             <Button

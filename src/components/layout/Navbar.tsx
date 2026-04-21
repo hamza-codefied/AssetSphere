@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { Search, Bell, Menu, Moon, Sun, LogOut } from 'lucide-react';
+import { Search, Bell, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { roleConfig } from '../../auth/permissions';
 
@@ -8,16 +7,7 @@ interface NavbarProps {
 }
 
 export const Navbar = ({ onMenuClick }: NavbarProps) => {
-  const [isDark, setIsDark] = useState(false);
   const { user, logout } = useAuth();
-
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
 
   const initials = user ? user.name.split(' ').map(n => n[0]).join('') : '??';
   const roleMeta = user ? roleConfig[user.role] : null;
@@ -43,14 +33,6 @@ export const Navbar = ({ onMenuClick }: NavbarProps) => {
       </div>
 
       <div className="flex items-center gap-2">
-        <button 
-          onClick={() => setIsDark(!isDark)}
-          className="p-2 hover:bg-accent rounded-xl text-muted-foreground transition-colors"
-          title="Toggle Dark Mode"
-        >
-          {isDark ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
-        </button>
-
         <button className="p-2 hover:bg-accent rounded-xl relative text-muted-foreground transition-colors">
           <Bell className="w-5 h-5" />
           <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-background"></span>

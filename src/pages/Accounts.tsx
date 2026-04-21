@@ -1,12 +1,51 @@
-import { useState } from 'react';
-import { Card, Badge, Button, Modal, CredentialField, CustomSelect } from '../components/ui';
-import { ShieldCheck, Mail, Cloud, Globe, ExternalLink, ShieldAlert, Key, Trash2 } from 'lucide-react';
-import type { Account } from '../types';
+import { useState, type ReactElement } from 'react';
+import {
+  Card, Badge, Button, Modal, CredentialField, CustomSelect, PasswordInput,
+  CustomCredentialFieldsEditor, customFieldRowsToStored, type CustomCredentialFieldRow
+} from '../components/ui';
+import {
+  ShieldCheck, Mail, Cloud, Globe, ExternalLink, ShieldAlert, Key, Trash2,
+  Smartphone, KeyRound, Copy, Check, RefreshCw, ShieldOff
+} from 'lucide-react';
+import type { Account, Credentials } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
 
+type TwoFactorMethod = 'Authenticator' | 'SMS' | 'Email';
+
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+const generateTotpSecret = (length = 32) => {
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += BASE32_ALPHABET[Math.floor(Math.random() * BASE32_ALPHABET.length)];
+  }
+  return out;
+};
+
+const generateBackupCodes = (count = 8) => {
+  const codes: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const raw = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, '').padEnd(8, 'X');
+    codes.push(`${raw.slice(0, 4)}-${raw.slice(4, 8)}`);
+  }
+  return codes;
+};
+
+const methodLabel: Record<TwoFactorMethod, string> = {
+  Authenticator: 'Authenticator App (TOTP)',
+  SMS: 'SMS Text Message',
+  Email: 'Email Code'
+};
+
+const methodIcon: Record<TwoFactorMethod, ReactElement> = {
+  Authenticator: <KeyRound className="w-4 h-4" />,
+  SMS: <Smartphone className="w-4 h-4" />,
+  Email: <Mail className="w-4 h-4" />
+};
+
 export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
-  const { accounts, tools, addAccount, deleteAccount } = state;
+  const { accounts, tools, addAccount, updateAccount, deleteAccount } = state;
   const { can } = useAuth();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,29 +54,127 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
   // Form State
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [type, setType] = useState<'Gmail' | 'AWS' | 'Domain' | 'Other'>('Gmail');
+  const [enable2FA, setEnable2FA] = useState(false);
+  const [twoFactorMethod, setTwoFactorMethod] = useState<TwoFactorMethod>('Authenticator');
+  const [twoFactorIssuer, setTwoFactorIssuer] = useState('Google Authenticator');
+  const [twoFactorSecret, setTwoFactorSecret] = useState(generateTotpSecret());
+  const [twoFactorPhone, setTwoFactorPhone] = useState('');
+  const [twoFactorRecoveryEmail, setTwoFactorRecoveryEmail] = useState('');
+  const [generateBackups, setGenerateBackups] = useState(true);
+  const [accountExtraFields, setAccountExtraFields] = useState<CustomCredentialFieldRow[]>([]);
+
+  // Detail-view state for backup-code reveal / copy feedback
+  const [backupCodesVisible, setBackupCodesVisible] = useState(false);
+  const [copiedCodes, setCopiedCodes] = useState(false);
+
+  const resetForm = () => {
+    setEmail('');
+    setName('');
+    setPassword('');
+    setType('Gmail');
+    setEnable2FA(false);
+    setTwoFactorMethod('Authenticator');
+    setTwoFactorIssuer('Google Authenticator');
+    setTwoFactorSecret(generateTotpSecret());
+    setTwoFactorPhone('');
+    setTwoFactorRecoveryEmail('');
+    setGenerateBackups(true);
+    setAccountExtraFields([]);
+    setBackupCodesVisible(false);
+    setCopiedCodes(false);
+    setIsAddMode(false);
+    setIsModalOpen(false);
+    setSelectedAccount(null);
+  };
+
+  const buildTwoFactor = (): Credentials['twoFactor'] | undefined => {
+    if (!enable2FA) return undefined;
+    const base: NonNullable<Credentials['twoFactor']> = {
+      type: twoFactorMethod,
+      enrolledAt: new Date().toISOString().split('T')[0],
+      ...(generateBackups ? { backupCodes: generateBackupCodes() } : {})
+    };
+    if (twoFactorMethod === 'Authenticator') {
+      return {
+        ...base,
+        issuer: twoFactorIssuer.trim() || 'Authenticator',
+        secret: twoFactorSecret
+      };
+    }
+    if (twoFactorMethod === 'SMS') {
+      return { ...base, phoneNumber: twoFactorPhone.trim() || undefined };
+    }
+    return { ...base, recoveryEmail: twoFactorRecoveryEmail.trim() || undefined };
+  };
 
   const handleAdd = () => {
+    if (!name.trim() || !email.trim() || !password.trim()) return;
+    if (enable2FA) {
+      if (twoFactorMethod === 'SMS' && !twoFactorPhone.trim()) return;
+      if (twoFactorMethod === 'Email' && !twoFactorRecoveryEmail.trim()) return;
+      if (twoFactorMethod === 'Authenticator' && !twoFactorSecret.trim()) return;
+    }
+    const twoFactor = buildTwoFactor();
+    const extraStored = customFieldRowsToStored(accountExtraFields);
     addAccount({
-      name: name || 'System Account',
-      email: email || 'account@company.com',
+      name,
+      email,
       type: type as any,
       status: 'Active',
       isCompanyOwned: true,
       credentials: {
-        email: email,
-        password: '••••••••',
+        email,
+        password,
+        ...(extraStored.length ? { customFields: extraStored } : {}),
+        ...(twoFactor ? { twoFactor } : {}),
         lastUpdated: new Date().toISOString().split('T')[0]
       }
     });
-    setIsModalOpen(false);
-    setIsAddMode(false);
-    setEmail('');
-    setName('');
+    resetForm();
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
+  const canReveal = can('vault.reveal_passwords');
+
+  const handleRegenerateBackupCodes = (account: Account) => {
+    if (!account.credentials.twoFactor) return;
+    const codes = generateBackupCodes();
+    updateAccount(account.id, {
+      credentials: {
+        ...account.credentials,
+        twoFactor: { ...account.credentials.twoFactor, backupCodes: codes },
+        lastUpdated: new Date().toISOString().split('T')[0]
+      }
+    });
+    setSelectedAccount({
+      ...account,
+      credentials: {
+        ...account.credentials,
+        twoFactor: { ...account.credentials.twoFactor, backupCodes: codes }
+      }
+    });
+    setBackupCodesVisible(true);
+  };
+
+  const handleDisable2FA = (account: Account) => {
+    const { twoFactor, ...rest } = account.credentials;
+    void twoFactor;
+    updateAccount(account.id, {
+      credentials: { ...rest, lastUpdated: new Date().toISOString().split('T')[0] }
+    });
+    setSelectedAccount({ ...account, credentials: { ...rest } });
+    setBackupCodesVisible(false);
+  };
+
+  const copyBackupCodes = (codes: string[]) => {
+    navigator.clipboard.writeText(codes.join('\n'));
+    setCopiedCodes(true);
+    setTimeout(() => setCopiedCodes(false), 2000);
+  };
+
+  const getTypeIcon = (accountType: string) => {
+    switch (accountType) {
       case 'Gmail': return <Mail className="w-4 h-4" />;
       case 'AWS': return <Cloud className="w-4 h-4" />;
       case 'Domain': return <Globe className="w-4 h-4" />;
@@ -79,7 +216,12 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
               <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center font-bold">
                 {getTypeIcon(account.type)}
               </div>
-              <Badge variant={account.status === 'Active' ? 'success' : 'danger'}>{account.status}</Badge>
+              <div className="flex items-center gap-2">
+                {account.credentials.twoFactor && (
+                  <Badge variant="success">2FA</Badge>
+                )}
+                <Badge variant={account.status === 'Active' ? 'success' : 'danger'}>{account.status}</Badge>
+              </div>
             </div>
             <h3 className="font-bold text-lg">{account.name}</h3>
             <p className="text-sm text-muted-foreground mb-4">{account.email}</p>
@@ -97,18 +239,31 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
 
       <Modal 
         isOpen={isModalOpen} 
-        onClose={() => { setIsModalOpen(false); setIsAddMode(false); }} 
+        onClose={resetForm} 
         title={isAddMode ? 'New Central Account' : 'Account Intelligence'}
       >
         {isAddMode ? (
           <div className="space-y-4">
              <div className="space-y-2">
-                <label className="text-sm font-medium">Identifier Name</label>
-                <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none" placeholder="e.g. Master Admin" />
+                <label className="text-sm font-medium">Identifier Name <span className="text-destructive">*</span></label>
+                <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. Master Admin" />
              </div>
              <div className="space-y-2">
-                <label className="text-sm font-medium">Email / Username</label>
-                <input value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none" placeholder="e.g. admin@company.com" />
+                <label className="text-sm font-medium">Email / Username <span className="text-destructive">*</span></label>
+                <input value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. admin@company.com" />
+             </div>
+             <div className="space-y-2">
+                <label className="text-sm font-medium">Password <span className="text-destructive">*</span></label>
+                <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter a strong password" />
+             </div>
+             <div className="space-y-2">
+                <label className="text-sm font-medium">Additional fields (optional)</label>
+                <p className="text-xs text-muted-foreground">API tokens, recovery email aliases, tenant IDs, or any other labeled secrets.</p>
+                <CustomCredentialFieldsEditor
+                  fields={accountExtraFields}
+                  onChange={setAccountExtraFields}
+                  addButtonLabel="Add field"
+                />
              </div>
              <div className="space-y-2">
                 <label className="text-sm font-medium">Account Provider</label>
@@ -123,9 +278,120 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                   ]}
                 />
              </div>
+             <div className="rounded-xl border bg-accent/30">
+                <div className="flex items-center gap-3 p-3 border-b">
+                  <input 
+                    type="checkbox" 
+                    id="enable2fa" 
+                    checked={enable2FA} 
+                    onChange={e => setEnable2FA(e.target.checked)}
+                    className="w-4 h-4 rounded accent-primary"
+                  />
+                  <label htmlFor="enable2fa" className="text-sm font-medium cursor-pointer flex-1">
+                    Enable Two-Factor Authentication (2FA)
+                  </label>
+                  {enable2FA && <Badge variant="success">Configured</Badge>}
+                </div>
+
+                {enable2FA && (
+                  <div className="p-4 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">2FA Method</label>
+                      <CustomSelect
+                        value={twoFactorMethod}
+                        onChange={(val) => setTwoFactorMethod(val as TwoFactorMethod)}
+                        options={[
+                          { value: 'Authenticator', label: 'Authenticator App (TOTP)' },
+                          { value: 'SMS', label: 'SMS Text Message' },
+                          { value: 'Email', label: 'Email Code' }
+                        ]}
+                      />
+                    </div>
+
+                    {twoFactorMethod === 'Authenticator' && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Issuer / App</label>
+                          <input
+                            value={twoFactorIssuer}
+                            onChange={(e) => setTwoFactorIssuer(e.target.value)}
+                            className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+                            placeholder="e.g. Google Authenticator, Authy, 1Password"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-between">
+                            <span>TOTP Secret (Base32)</span>
+                            <button
+                              type="button"
+                              onClick={() => setTwoFactorSecret(generateTotpSecret())}
+                              className="normal-case text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-3 h-3" /> Regenerate
+                            </button>
+                          </label>
+                          <input
+                            value={twoFactorSecret}
+                            onChange={(e) => setTwoFactorSecret(e.target.value.toUpperCase())}
+                            className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 font-mono text-xs tracking-widest"
+                            placeholder="Enter or generate a secret"
+                          />
+                          <p className="text-[11px] text-muted-foreground">Scan this into your authenticator app manually, or share the secret with the account owner.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {twoFactorMethod === 'SMS' && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Phone Number</label>
+                        <input
+                          value={twoFactorPhone}
+                          onChange={(e) => setTwoFactorPhone(e.target.value)}
+                          className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+                          placeholder="+1 555 123 4567"
+                        />
+                        <p className="text-[11px] text-muted-foreground">Codes will be sent via text. Use an international format with country code.</p>
+                      </div>
+                    )}
+
+                    {twoFactorMethod === 'Email' && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Recovery Email</label>
+                        <input
+                          value={twoFactorRecoveryEmail}
+                          onChange={(e) => setTwoFactorRecoveryEmail(e.target.value)}
+                          className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+                          placeholder="recovery@company.com"
+                        />
+                      </div>
+                    )}
+
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={generateBackups}
+                        onChange={(e) => setGenerateBackups(e.target.checked)}
+                        className="w-4 h-4 rounded accent-primary"
+                      />
+                      <span className="text-sm">Generate 8 one-time backup codes</span>
+                    </label>
+                  </div>
+                )}
+             </div>
              <div className="flex gap-3 pt-4">
-               <Button variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-               <Button className="flex-1 bg-violet-600 hover:bg-violet-700" onClick={handleAdd}>Save Account</Button>
+               <Button variant="outline" className="flex-1" onClick={resetForm}>Cancel</Button>
+               <Button 
+                 className="flex-1 bg-violet-600 hover:bg-violet-700" 
+                 onClick={handleAdd}
+                 disabled={
+                   !name.trim() || !email.trim() || !password.trim() ||
+                   (enable2FA && twoFactorMethod === 'SMS' && !twoFactorPhone.trim()) ||
+                   (enable2FA && twoFactorMethod === 'Email' && !twoFactorRecoveryEmail.trim()) ||
+                   (enable2FA && twoFactorMethod === 'Authenticator' && !twoFactorSecret.trim())
+                 }
+               >
+                 Save Account
+               </Button>
              </div>
           </div>
         ) : selectedAccount ? (
@@ -134,9 +400,13 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
               <div className="w-12 h-12 rounded-2xl bg-violet-500 text-white flex items-center justify-center shadow-lg shadow-violet-500/20">
                 {getTypeIcon(selectedAccount.type)}
               </div>
-              <div>
+              <div className="flex-1">
                 <h2 className="text-lg font-bold">{selectedAccount.name}</h2>
                 <p className="text-sm text-muted-foreground">{selectedAccount.email}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant={selectedAccount.status === 'Active' ? 'success' : 'danger'}>{selectedAccount.status}</Badge>
+                {selectedAccount.credentials.twoFactor && <Badge variant="info">2FA Active</Badge>}
               </div>
             </div>
 
@@ -145,10 +415,150 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                 <ShieldAlert className="w-4 h-4 text-violet-500" />
                 Security Layer
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-3">
+                <CredentialField label="Email / Username" value={selectedAccount.credentials.email || selectedAccount.email} isMasked={false} />
                 <CredentialField label="Password" value={selectedAccount.credentials.password || ''} />
+                {selectedAccount.credentials.customFields?.map((cf, i) => (
+                  <CredentialField key={`${cf.key}-${i}`} label={cf.key} value={cf.value} />
+                ))}
+                <p className="text-[10px] text-muted-foreground">Last updated: {selectedAccount.credentials.lastUpdated}</p>
               </div>
             </div>
+
+            {selectedAccount.credentials.twoFactor ? (
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
+                <div className="flex items-center gap-3 p-4 border-b border-emerald-500/10">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                    {methodIcon[selectedAccount.credentials.twoFactor.type]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Two-Factor Authentication</p>
+                    <p className="text-sm font-semibold truncate">{methodLabel[selectedAccount.credentials.twoFactor.type]}</p>
+                  </div>
+                  <Badge variant="success">Active</Badge>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Method</p>
+                      <p className="font-medium">{selectedAccount.credentials.twoFactor.type}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Enrolled</p>
+                      <p className="font-medium">{selectedAccount.credentials.twoFactor.enrolledAt || selectedAccount.credentials.lastUpdated}</p>
+                    </div>
+                  </div>
+
+                  {selectedAccount.credentials.twoFactor.type === 'Authenticator' && (
+                    <div className="space-y-3">
+                      {selectedAccount.credentials.twoFactor.issuer && (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Issuer / App</p>
+                          <p className="text-sm font-medium">{selectedAccount.credentials.twoFactor.issuer}</p>
+                        </div>
+                      )}
+                      {selectedAccount.credentials.twoFactor.secret && (
+                        canReveal ? (
+                          <CredentialField label="TOTP Secret" value={selectedAccount.credentials.twoFactor.secret} />
+                        ) : (
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">TOTP Secret</label>
+                            <div className="flex items-center gap-2 bg-accent/50 p-2.5 rounded-xl border">
+                              <div className="flex-1 font-mono text-sm text-muted-foreground">●●●● ●●●● ●●●● ●●●●</div>
+                              <ShieldOff className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                  {selectedAccount.credentials.twoFactor.type === 'SMS' && selectedAccount.credentials.twoFactor.phoneNumber && (
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Phone Number</p>
+                      <p className="text-sm font-mono">{selectedAccount.credentials.twoFactor.phoneNumber}</p>
+                    </div>
+                  )}
+
+                  {selectedAccount.credentials.twoFactor.type === 'Email' && selectedAccount.credentials.twoFactor.recoveryEmail && (
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Recovery Email</p>
+                      <p className="text-sm font-mono">{selectedAccount.credentials.twoFactor.recoveryEmail}</p>
+                    </div>
+                  )}
+
+                  {selectedAccount.credentials.twoFactor.backupCodes && selectedAccount.credentials.twoFactor.backupCodes.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Backup Codes ({selectedAccount.credentials.twoFactor.backupCodes.length})
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {canReveal && (
+                            <button
+                              type="button"
+                              onClick={() => setBackupCodesVisible(v => !v)}
+                              className="text-[11px] font-semibold text-primary hover:underline"
+                            >
+                              {backupCodesVisible ? 'Hide' : 'Reveal'}
+                            </button>
+                          )}
+                          {canReveal && backupCodesVisible && (
+                            <button
+                              type="button"
+                              onClick={() => copyBackupCodes(selectedAccount.credentials.twoFactor!.backupCodes!)}
+                              className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+                            >
+                              {copiedCodes ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                              {copiedCodes ? 'Copied' : 'Copy all'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {selectedAccount.credentials.twoFactor.backupCodes.map((code, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-accent/60 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center tracking-widest"
+                          >
+                            {canReveal && backupCodesVisible ? code : '●●●● ●●●●'}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Each code can be used once if the primary 2FA method is unavailable.</p>
+                    </div>
+                  )}
+
+                  {can('accounts.edit') && (
+                    <div className="flex gap-2 pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleRegenerateBackupCodes(selectedAccount)}
+                      >
+                        <RefreshCw className="w-4 h-4" /> Rotate Backup Codes
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDisable2FA(selectedAccount)}
+                      >
+                        <ShieldOff className="w-4 h-4" /> Disable 2FA
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed p-4 flex items-center gap-3 bg-accent/20">
+                <ShieldOff className="w-5 h-5 text-amber-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">Two-Factor Auth Disabled</p>
+                  <p className="text-xs text-muted-foreground">This account relies on password only. Enable 2FA for stronger protection.</p>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               <h3 className="text-sm font-bold border-b pb-2 flex items-center gap-2 text-violet-500">
@@ -173,11 +583,11 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
 
             <div className="pt-4 flex gap-3">
               {can('accounts.delete') && (
-                <Button variant="danger" className="flex-1" onClick={() => { deleteAccount(selectedAccount.id); setIsModalOpen(false); }}>
+                <Button variant="danger" className="flex-1" onClick={() => { deleteAccount(selectedAccount.id); resetForm(); }}>
                   <Trash2 className="w-4 h-4" /> Delete Account
                 </Button>
               )}
-              <Button variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Close</Button>
+              <Button variant="outline" className="flex-1" onClick={resetForm}>Close</Button>
             </div>
           </div>
         ) : null}

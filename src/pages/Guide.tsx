@@ -72,7 +72,7 @@ export const Guide = () => {
         <main className="lg:col-span-3 space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              <div className="prose dark:prose-invert">
+              <div className="prose prose-invert">
                 <h2 className="text-2xl font-bold">Welcome to AssetSphere</h2>
                 <p className="text-muted-foreground">
                   AssetSphere is an enterprise-grade Internal Resource Management System designed to bridge the gap between 
@@ -147,7 +147,7 @@ export const Guide = () => {
 
           {activeTab === 'testing' && (
             <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
-              <div className="prose dark:prose-invert max-w-none">
+              <div className="prose prose-invert max-w-none">
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <Terminal className="w-6 h-6 text-emerald-500" />
                   Testing Protocols & Scenarios

@@ -1,17 +1,19 @@
 import React from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import type { Permission } from '../../auth/permissions';
-import { 
-  LayoutDashboard, 
-  Monitor, 
-  ExternalLink, 
-  Users, 
-  Key, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Monitor,
+  ExternalLink,
+  Users,
+  Key,
+  Settings,
   LogOut,
   ChevronRight,
   ShieldCheck,
-  BookOpen
+  BookOpen,
+  CreditCard,
+  FolderOpen,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -52,18 +54,18 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed }: SidebarProps) =>
   const { can, logout } = useAuth();
 
   const allMenuItems: { id: string; label: string; icon: React.ElementType; permission: Permission }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
-    { id: 'hardware', label: 'Hardware', icon: Monitor, permission: 'hardware.view' },
-    { id: 'tools', label: 'Tools & Platforms', icon: ExternalLink, permission: 'tools.view' },
-    { id: 'accounts', label: 'Central Accounts', icon: ShieldCheck, permission: 'accounts.view' },
-    { id: 'employees', label: 'Employees', icon: Users, permission: 'employees.view' },
-    { id: 'vault', label: 'Credential Vault', icon: Key, permission: 'vault.view' },
-    { id: 'guide', label: 'User Guide', icon: BookOpen, permission: 'guide.view' },
+    { id: 'dashboard',     label: 'Dashboard',       icon: LayoutDashboard, permission: 'dashboard.view' },
+    { id: 'hardware',      label: 'Hardware',         icon: Monitor,         permission: 'hardware.view' },
+    { id: 'tools',         label: 'Tools & Platforms', icon: ExternalLink,   permission: 'tools.view' },
+    { id: 'accounts',      label: 'Central Accounts', icon: ShieldCheck,     permission: 'accounts.view' },
+    { id: 'subscriptions', label: 'Subscriptions',    icon: CreditCard,      permission: 'subscriptions.view' },
+    { id: 'projects',      label: 'Projects',         icon: FolderOpen,      permission: 'projects.view' },
+    { id: 'employees',     label: 'Employees',        icon: Users,           permission: 'employees.view' },
+    { id: 'vault',         label: 'Credential Vault', icon: Key,             permission: 'vault.view' },
+    { id: 'guide',         label: 'User Guide',       icon: BookOpen,        permission: 'guide.view' },
   ];
 
   const menuItems = allMenuItems.filter(item => can(item.permission));
-
-
 
   return (
     <div className={cn(
@@ -77,7 +79,7 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed }: SidebarProps) =>
         {!collapsed && <span className="font-bold text-xl tracking-tight">AssetSphere</span>}
       </div>
 
-      <div className="flex-1 px-3 space-y-1 py-4">
+      <div className="flex-1 px-3 space-y-1 py-4 overflow-y-auto">
         {menuItems.map((item) => (
           <SidebarItem
             key={item.id}

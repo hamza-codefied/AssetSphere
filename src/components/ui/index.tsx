@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Copy, Check, ChevronDown } from 'lucide-react';
+import { Eye, EyeOff, Copy, Check, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -53,6 +53,108 @@ export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
     );
   }
 );
+
+export const PasswordInput = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(({ className, ...props }, ref) => {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative w-full">
+      <input
+        ref={ref}
+        type={visible ? 'text' : 'password'}
+        className={cn(
+          'w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 pr-10',
+          className
+        )}
+        {...props}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible(!visible)}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md"
+        aria-label={visible ? 'Hide password' : 'Show password'}
+        tabIndex={-1}
+      >
+        {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+});
+PasswordInput.displayName = 'PasswordInput';
+
+/** UI row with stable React key for custom credential key/value editors */
+export type CustomCredentialFieldRow = { id: string; key: string; value: string };
+
+let __customFieldSeq = 0;
+export const newCustomFieldRow = (): CustomCredentialFieldRow => ({
+  id: `cf-${Date.now()}-${++__customFieldSeq}`,
+  key: '',
+  value: ''
+});
+
+export function storedToCustomFieldRows(stored?: { key: string; value: string }[]): CustomCredentialFieldRow[] {
+  return (stored ?? []).map((f, i) => ({
+    id: `cf-init-${i}-${f.key}`,
+    key: f.key,
+    value: f.value
+  }));
+}
+
+export function customFieldRowsToStored(rows: CustomCredentialFieldRow[]): { key: string; value: string }[] {
+  return rows
+    .filter((r) => r.key.trim() || r.value.trim())
+    .map((r) => ({ key: r.key.trim(), value: r.value.trim() }));
+}
+
+export const CustomCredentialFieldsEditor = ({
+  fields,
+  onChange,
+  addButtonLabel = 'Add field'
+}: {
+  fields: CustomCredentialFieldRow[];
+  onChange: (next: CustomCredentialFieldRow[]) => void;
+  addButtonLabel?: string;
+}) => {
+  const add = () => onChange([...fields, newCustomFieldRow()]);
+  const remove = (id: string) => onChange(fields.filter((f) => f.id !== id));
+  const patch = (id: string, updates: Partial<Pick<CustomCredentialFieldRow, 'key' | 'value'>>) =>
+    onChange(fields.map((f) => (f.id === id ? { ...f, ...updates } : f)));
+
+  return (
+    <div className="space-y-2">
+      {fields.map((row) => (
+        <div key={row.id} className="flex gap-2 items-center">
+          <input
+            value={row.key}
+            onChange={(e) => patch(row.id, { key: e.target.value })}
+            placeholder="Field name"
+            className="flex-1 min-w-0 bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+          />
+          <input
+            value={row.value}
+            onChange={(e) => patch(row.id, { value: e.target.value })}
+            placeholder="Value"
+            className="flex-1 min-w-0 bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 text-sm font-mono"
+          />
+          <button
+            type="button"
+            onClick={() => remove(row.id)}
+            className="p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 transition-colors"
+            aria-label="Remove field"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+      <Button type="button" variant="outline" className="w-full border-dashed gap-2" onClick={add}>
+        <Plus className="w-4 h-4" />
+        {addButtonLabel}
+      </Button>
+    </div>
+  );
+};
 
 export const CredentialField = ({ label, value, isMasked = true }: { label: string; value: string; type?: string; isMasked?: boolean }) => {
   const [visible, setVisible] = useState(!isMasked);
@@ -155,8 +257,10 @@ export const CustomSelect = <T extends string | number>({
   );
 };
 
-export const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }) => {
+export const Modal = ({ isOpen, onClose, title, children, size = 'md' }: { isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'md' | 'lg' | 'xl' }) => {
   if (!isOpen) return null;
+
+  const sizeClass = size === 'xl' ? 'max-w-3xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -165,7 +269,7 @@ export const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; o
         onClick={onClose} 
       />
       
-      <div className="bg-card text-card-foreground p-8 rounded-3xl border shadow-2xl w-full max-w-lg relative z-50 premium-card h-auto overflow-visible animate-in fade-in zoom-in-95 duration-200">
+      <div className={cn("bg-card text-card-foreground p-8 rounded-3xl border shadow-2xl w-full relative z-50 premium-card h-auto overflow-visible animate-in fade-in zoom-in-95 duration-200", sizeClass)}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">{title}</h2>
           <button onClick={onClose} className="p-2 hover:bg-accent rounded-xl transition-colors">

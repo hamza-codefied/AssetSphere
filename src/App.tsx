@@ -3,6 +3,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Hardware } from './pages/Hardware';
 import { Tools } from './pages/Tools';
 import { Accounts } from './pages/Accounts';
+import { Subscriptions } from './pages/Subscriptions';
+import { Projects } from './pages/Projects';
 import { Employees } from './pages/Employees';
 import { Vault } from './pages/Vault';
 import { Guide } from './pages/Guide';
@@ -50,6 +52,10 @@ function AuthenticatedApp() {
             return can('tools.view') ? <Tools state={state} /> : <AccessDenied />;
           case 'accounts':
             return can('accounts.view') ? <Accounts state={state} /> : <AccessDenied />;
+          case 'subscriptions':
+            return can('subscriptions.view') ? <Subscriptions state={state} /> : <AccessDenied />;
+          case 'projects':
+            return can('projects.view') ? <Projects state={state} /> : <AccessDenied />;
           case 'employees':
             return can('employees.view') ? <Employees state={state} /> : <AccessDenied />;
           case 'vault':

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -7,9 +7,38 @@ interface MainLayoutProps {
   children: (activeTab: string) => React.ReactNode;
 }
 
+const TAB_STORAGE_KEY = 'assetsphere-active-tab';
+
+const VALID_TABS = new Set([
+  'dashboard', 'hardware', 'tools', 'accounts', 'subscriptions', 'projects', 'employees', 'vault', 'guide', 'settings'
+]);
+
+function readStoredTab(): string {
+  try {
+    const raw = sessionStorage.getItem(TAB_STORAGE_KEY);
+    if (raw && VALID_TABS.has(raw)) return raw;
+  } catch {
+    /* private mode */
+  }
+  return 'dashboard';
+}
+
+function persistTab(tab: string) {
+  try {
+    if (VALID_TABS.has(tab)) sessionStorage.setItem(TAB_STORAGE_KEY, tab);
+  } catch {
+    /* ignore */
+  }
+}
+
 export const MainLayout = ({ children }: MainLayoutProps) => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTabState] = useState(readStoredTab);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const setActiveTab = useCallback((tab: string) => {
+    setActiveTabState(tab);
+    persistTab(tab);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground overflow-hidden">

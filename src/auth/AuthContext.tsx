@@ -13,8 +13,37 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+/** Persists session across full page reloads (only public user fields — never passwords). */
+const AUTH_STORAGE_KEY = 'assetsphere-auth-user';
+
+function loadStoredUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AuthUser;
+    if (!parsed?.id || !parsed?.email || !parsed?.role) return null;
+    const match = mockUsers.find(
+      (u) =>
+        u.user.id === parsed.id &&
+        u.user.email.toLowerCase() === String(parsed.email).toLowerCase()
+    );
+    return match ? match.user : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistUser(next: AuthUser | null) {
+  try {
+    if (!next) localStorage.removeItem(AUTH_STORAGE_KEY);
+    else localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(loadStoredUser);
 
   const login = (email: string, password: string): { success: boolean; error?: string } => {
     const found = mockUsers.find(
@@ -22,12 +51,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
     if (found) {
       setUser(found.user);
+      persistUser(found.user);
       return { success: true };
     }
     return { success: false, error: 'Invalid email or password.' };
   };
 
-  const logout = () => setUser(null);
+  const logout = () => {
+    setUser(null);
+    persistUser(null);
+  };
 
   const can = (permission: Permission): boolean => {
     if (!user) return false;
