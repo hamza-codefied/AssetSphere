@@ -193,7 +193,7 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {(['Active', 'Completed', 'Archived'] as ProjectStatus[]).map(s => (
           <Card key={s} className="flex items-center gap-3 p-4">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s === 'Active' ? 'bg-emerald-500/10 text-emerald-500' : s === 'Completed' ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-500/10 text-slate-400'}`}>
@@ -264,7 +264,7 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
       <Modal isOpen={isModalOpen} onClose={resetForm} title={isAddMode ? 'New Project' : selectedProject?.name || ''} size="xl">
         {isAddMode ? (
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Project Name <span className="text-destructive">*</span></label>
                 <input value={fName} onChange={e => setFName(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. E-Commerce Relaunch" />
@@ -278,7 +278,7 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
               <label className="text-sm font-medium">Description</label>
               <textarea value={fDescription} onChange={e => setFDescription(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 resize-none h-16" placeholder="Brief project overview..." />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Status</label>
                 <CustomSelect value={fStatus} onChange={val => setFStatus(val as ProjectStatus)} options={[
@@ -375,7 +375,7 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
             {/* Hardware */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Assign Hardware</label>
-              <div className="grid grid-cols-2 gap-1 max-h-24 overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-24 overflow-y-auto custom-scrollbar">
                 {hardware.map(hw => (
                   <label key={hw.id} className={`flex items-center gap-2 p-2 rounded-xl border cursor-pointer transition-all text-sm ${fHardwareIds.includes(hw.id) ? 'bg-primary/10 border-primary/30' : 'bg-accent/40 border-transparent hover:border-border'}`}>
                     <input type="checkbox" checked={fHardwareIds.includes(hw.id)} onChange={() => setFHardwareIds(prev => toggleArr(prev, hw.id))} className="accent-primary" />
@@ -388,7 +388,7 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
             {/* Subscriptions */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Link Subscriptions</label>
-              <div className="grid grid-cols-2 gap-1 max-h-24 overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-24 overflow-y-auto custom-scrollbar">
                 {subscriptions.map(sub => (
                   <label key={sub.id} className={`flex items-center gap-2 p-2 rounded-xl border cursor-pointer transition-all text-sm ${fSubscriptionIds.includes(sub.id) ? 'bg-primary/10 border-primary/30' : 'bg-accent/40 border-transparent hover:border-border'}`}>
                     <input type="checkbox" checked={fSubscriptionIds.includes(sub.id)} onChange={() => setFSubscriptionIds(prev => toggleArr(prev, sub.id))} className="accent-primary" />
@@ -415,7 +415,7 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
               )}
               <div className="p-3 border rounded-xl bg-accent/20 space-y-2">
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Add Credential Entry</p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input value={newCredLabel} onChange={e => setNewCredLabel(e.target.value)} className="w-full bg-accent p-2 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 text-sm" placeholder="Label *" />
                   <input value={newCredUsername} onChange={e => setNewCredUsername(e.target.value)} className="w-full bg-accent p-2 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 text-sm" placeholder="Username" />
                 </div>
@@ -465,13 +465,13 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
               {/* Overview */}
               {activeDetailTab === 'overview' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Start Date</p><div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" />{selectedProject.startDate}</div></div>
                     {selectedProject.endDate && <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">End Date</p><div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" />{selectedProject.endDate}</div></div>}
                     <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Project Manager</p><p className="font-medium">{getEmployee(selectedProject.projectManager)?.name || 'Unassigned'}</p></div>
                     <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Team Size</p><p className="font-medium">{selectedProject.members.length} members</p></div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                     <div className="bg-accent/40 rounded-xl p-3"><p className="text-2xl font-bold">{selectedProject.members.length}</p><p className="text-[10px] text-muted-foreground uppercase font-bold">Team</p></div>
                     <div className="bg-accent/40 rounded-xl p-3"><p className="text-2xl font-bold">{selectedProject.standaloneCredentials.length + selectedProject.linkedAccountIds.length}</p><p className="text-[10px] text-muted-foreground uppercase font-bold">Credentials</p></div>
                     <div className="bg-accent/40 rounded-xl p-3"><p className="text-2xl font-bold">{selectedProject.hardwareIds.length}</p><p className="text-[10px] text-muted-foreground uppercase font-bold">Hardware</p></div>

@@ -386,7 +386,7 @@ export const Hardware = ({ state: _state }: { state: ReturnType<typeof useSystem
           </div>
         ) : selectedAsset ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Status</p>
                 {getStatusBadge(selectedAsset.status)}

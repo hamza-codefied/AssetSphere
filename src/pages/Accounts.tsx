@@ -600,7 +600,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                 </div>
 
                 <div className="p-4 space-y-4">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Method</p>
                       <p className="font-medium">{selectedAccount.credentials.twoFactor.type}</p>
@@ -698,7 +698,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                           )}
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         {selectedAccount.credentials.twoFactor.backupCodes.map((_, idx) => (
                           <div
                             key={idx}
@@ -821,7 +821,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
               className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Account Provider</label>
               <CustomSelect

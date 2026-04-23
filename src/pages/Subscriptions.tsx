@@ -328,7 +328,7 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
       >
         {isAddMode ? (
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2 col-span-2 sm:col-span-1">
                 <label className="text-sm font-medium">Subscription Name <span className="text-destructive">*</span></label>
                 <input value={fName} onChange={e => setFName(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. GitHub Enterprise" />
@@ -338,7 +338,7 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
                 <input value={fVendor} onChange={e => setFVendor(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. GitHub Inc." />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Type</label>
                 <CustomSelect value={fType} onChange={val => setFType(val as Subscription['type'])} options={[
@@ -359,7 +359,7 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
                 ]} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Cost ($)</label>
                 <input type="number" value={fCost} onChange={e => setFCost(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="0.00" min="0" />
@@ -373,7 +373,7 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
                 <input type="date" value={fRenewalDate} onChange={e => setFRenewalDate(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">License Count</label>
                 <input type="number" value={fLicenseCount} onChange={e => setFLicenseCount(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. 25" min="1" />
@@ -396,7 +396,7 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
             {(fScope === 'Individual' || fScope === 'Team') && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Assign Employees</label>
-                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
                   {employees.filter(e => e.status === 'Active').map(emp => (
                     <label key={emp.id} className={`flex items-center gap-2 p-2 rounded-xl border cursor-pointer transition-all ${fAssignedToIds.includes(emp.id) ? 'bg-primary/10 border-primary/30' : 'bg-accent/40 border-transparent hover:border-border'}`}>
                       <input type="checkbox" checked={fAssignedToIds.includes(emp.id)} onChange={() => toggleAssignee(emp.id)} className="accent-primary" />
@@ -464,7 +464,7 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
             )}
 
             {/* Details Grid */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cost</p>
                 <p className="font-semibold text-lg">{formatCurrency(selectedSub.cost, selectedSub.billingCycle)}</p>

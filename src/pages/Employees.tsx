@@ -517,7 +517,7 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
                   : 'Share this with the employee so they can log in and change it later.'}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Access Role <span className="text-destructive">*</span></label>
                 <CustomSelect

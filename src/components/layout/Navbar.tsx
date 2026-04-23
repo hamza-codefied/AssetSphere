@@ -15,7 +15,7 @@ export const Navbar = ({ onMenuClick, onProfileClick, onLogoutClick }: NavbarPro
   const roleMeta = user ? roleConfig[user.role] : null;
 
   return (
-    <nav className="h-16 border-b bg-card/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-6">
+    <nav className="h-16 border-b bg-card/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6">
       <div className="flex items-center gap-4 flex-1">
         <button 
           onClick={onMenuClick}

@@ -48,9 +48,11 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   collapsed?: boolean;
   onLogoutClick?: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export const Sidebar = ({ activeTab, setActiveTab, collapsed, onLogoutClick }: SidebarProps) => {
+export const Sidebar = ({ activeTab, setActiveTab, collapsed, onLogoutClick, mobileOpen, onMobileClose }: SidebarProps) => {
   const { can } = useAuth();
 
   const allMenuItems: { id: string; label: string; icon: React.ElementType; permission: Permission }[] = [
@@ -69,14 +71,18 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed, onLogoutClick }: S
 
   return (
     <div className={cn(
-      "h-screen bg-card border-r flex flex-col transition-all duration-300",
-      collapsed ? "w-20" : "w-64"
+      "fixed inset-y-0 left-0 z-50 lg:relative lg:z-auto bg-card border-r flex flex-col transition-all duration-300 ease-in-out",
+      collapsed ? "lg:w-20" : "lg:w-64",
+      mobileOpen ? "translate-x-0 w-64 shadow-2xl" : "-translate-x-full lg:translate-x-0"
     )}>
       <div className="p-6 flex items-center gap-3">
         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
           <Key className="w-5 h-5" />
         </div>
-        {!collapsed && <span className="font-bold text-xl tracking-tight">AssetSphere</span>}
+        <span className={cn(
+          "font-bold text-xl tracking-tight transition-opacity duration-300",
+          collapsed && "lg:opacity-0"
+        )}>AssetSphere</span>
       </div>
 
       <div className="flex-1 px-3 space-y-1 py-4 overflow-y-auto custom-scrollbar">
@@ -86,7 +92,10 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed, onLogoutClick }: S
             icon={item.icon}
             label={item.label}
             isActive={activeTab === item.id}
-            onClick={() => setActiveTab(item.id)}
+            onClick={() => {
+              setActiveTab(item.id);
+              onMobileClose?.();
+            }}
             collapsed={collapsed}
           />
         ))}
@@ -96,7 +105,10 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed, onLogoutClick }: S
         <SidebarItem
           icon={LogOut}
           label="Logout"
-          onClick={() => onLogoutClick?.()}
+          onClick={() => {
+            onLogoutClick?.();
+            onMobileClose?.();
+          }}
           collapsed={collapsed}
         />
       </div>

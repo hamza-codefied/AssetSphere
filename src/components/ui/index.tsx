@@ -8,7 +8,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export const Card = ({ children, className, onClick }: { children: React.ReactNode; className?: string; onClick?: () => void }) => (
-  <div className={cn("premium-card p-6", className)} onClick={onClick}>
+  <div className={cn("premium-card p-4 sm:p-6", className)} onClick={onClick}>
     {children}
   </div>
 );
@@ -125,23 +125,33 @@ export const CustomCredentialFieldsEditor = ({
   return (
     <div className="space-y-2">
       {fields.map((row) => (
-        <div key={row.id} className="flex gap-2 items-center">
-          <input
-            value={row.key}
-            onChange={(e) => patch(row.id, { key: e.target.value })}
-            placeholder="Field name"
-            className="flex-1 min-w-0 bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-          />
+        <div key={row.id} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+          <div className="flex gap-2 w-full">
+            <input
+              value={row.key}
+              onChange={(e) => patch(row.id, { key: e.target.value })}
+              placeholder="Field name"
+              className="flex-1 min-w-0 bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => remove(row.id)}
+              className="p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 transition-colors sm:hidden"
+              aria-label="Remove field"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
           <input
             value={row.value}
             onChange={(e) => patch(row.id, { value: e.target.value })}
             placeholder="Value"
-            className="flex-1 min-w-0 bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 text-sm font-mono"
+            className="w-full sm:flex-1 min-w-0 bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 text-sm font-mono"
           />
           <button
             type="button"
             onClick={() => remove(row.id)}
-            className="p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 transition-colors"
+            className="hidden sm:block p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 transition-colors"
             aria-label="Remove field"
           >
             <Trash2 className="w-4 h-4" />
@@ -314,9 +324,9 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }: { isOpe
         onClick={onClose} 
       />
       
-      <div className={cn("bg-card text-card-foreground p-8 rounded-3xl border shadow-2xl w-full relative z-50 premium-card h-auto overflow-visible animate-in fade-in zoom-in-95 duration-200", sizeClass)}>
+      <div className={cn("bg-card text-card-foreground p-6 sm:p-8 rounded-3xl border shadow-2xl w-full relative z-50 premium-card h-auto overflow-visible animate-in fade-in zoom-in-95 duration-200", sizeClass)}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">{title}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold">{title}</h2>
           <button onClick={onClose} className="p-2 hover:bg-accent rounded-xl transition-colors">
             <span className="sr-only">Close</span>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

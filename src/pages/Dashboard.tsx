@@ -134,22 +134,26 @@ export const Dashboard = ({ state }: { state: ReturnType<typeof useSystemState> 
               <div className="p-4 rounded-2xl bg-card border text-sm text-muted-foreground">Loading activity...</div>
             )}
             {activities.slice(0, 8).map((activity) => (
-              <div key={activity.id} className="flex gap-4 p-4 rounded-2xl bg-card border hover:border-primary/30 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
-                  {activity.module === 'Hardware' && <Monitor className="w-5 h-5" />}
-                  {activity.module === 'Tools' && <ExternalLink className="w-5 h-5" />}
-                  {activity.module === 'Accounts' && <ShieldCheck className="w-5 h-5" />}
-                  {activity.module === 'Subscriptions' && <CreditCard className="w-5 h-5" />}
-                  {activity.module === 'Projects' && <FolderOpen className="w-5 h-5" />}
-                  {activity.module === 'Employees' && <Users className="w-5 h-5" />}
+              <div key={activity.id} className="flex flex-col sm:flex-row gap-4 p-4 rounded-2xl bg-card border hover:border-primary/30 transition-colors relative">
+                <div className="flex gap-4 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
+                    {activity.module === 'Hardware' && <Monitor className="w-5 h-5" />}
+                    {activity.module === 'Tools' && <ExternalLink className="w-5 h-5" />}
+                    {activity.module === 'Accounts' && <ShieldCheck className="w-5 h-5" />}
+                    {activity.module === 'Subscriptions' && <CreditCard className="w-5 h-5" />}
+                    {activity.module === 'Projects' && <FolderOpen className="w-5 h-5" />}
+                    {activity.module === 'Employees' && <Users className="w-5 h-5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium pr-16 sm:pr-0 truncate sm:whitespace-normal">{activity.description}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {activity.userName} · {new Date(activity.timestamp).toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{activity.description}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {activity.userName} · {new Date(activity.timestamp).toLocaleDateString()}
-                  </p>
+                <div className="absolute top-4 right-4 sm:static shrink-0">
+                  <Badge variant="info" className="text-[10px] sm:text-xs">{activity.type}</Badge>
                 </div>
-                <Badge variant="info">{activity.type}</Badge>
               </div>
             ))}
           </div>
