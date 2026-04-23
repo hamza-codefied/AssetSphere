@@ -38,7 +38,7 @@ export const Navbar = ({ onMenuClick }: NavbarProps) => {
           <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-background"></span>
         </button>
         
-        <div className="h-8 w-[1px] bg-border mx-2"></div>
+        <div className="h-8 w-px bg-border mx-2"></div>
         
         <button className="flex items-center gap-3 p-1.5 hover:bg-accent rounded-xl transition-colors">
           <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-medium text-sm">

@@ -38,7 +38,7 @@ const SidebarItem = ({ icon: Icon, label, isActive, onClick, collapsed }: Sideba
       isActive && "sidebar-link-active"
     )}
   >
-    <Icon className="w-5 h-5 flex-shrink-0" />
+    <Icon className="w-5 h-5 shrink-0" />
     {!collapsed && <span className="font-medium whitespace-nowrap">{label}</span>}
     {!collapsed && isActive && <ChevronRight className="ml-auto w-4 h-4 opacity-70" />}
   </button>
