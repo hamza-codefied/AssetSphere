@@ -45,7 +45,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
@@ -60,7 +60,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           onLogoutClick={() => setIsLogoutModalOpen(true)}
         />
         
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
           <div className="max-w-7xl mx-auto space-y-8">
             <AnimatePresence mode="wait">
               <motion.div

@@ -79,7 +79,7 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed, onLogoutClick }: S
         {!collapsed && <span className="font-bold text-xl tracking-tight">AssetSphere</span>}
       </div>
 
-      <div className="flex-1 px-3 space-y-1 py-4 overflow-y-auto">
+      <div className="flex-1 px-3 space-y-1 py-4 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => (
           <SidebarItem
             key={item.id}
