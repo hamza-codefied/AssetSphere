@@ -5,6 +5,7 @@ import {
   deleteHardware,
   getHardware,
   updateHardware,
+  revealHardwareCredentials,
 } from './service';
 import type {
   AssignHardwarePayload,
@@ -51,6 +52,12 @@ export function useAssignHardwareMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: hardwareQueryKey });
     },
+  });
+}
+
+export function useRevealHardwareCredentialsMutation() {
+  return useMutation({
+    mutationFn: (id: string) => revealHardwareCredentials(id),
   });
 }
 

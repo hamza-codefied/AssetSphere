@@ -10,7 +10,7 @@ interface MainLayoutProps {
 const TAB_STORAGE_KEY = 'assetsphere-active-tab';
 
 const VALID_TABS = new Set([
-  'dashboard', 'hardware', 'tools', 'accounts', 'subscriptions', 'projects', 'employees', 'vault', 'guide', 'settings'
+  'dashboard', 'hardware', 'tools', 'accounts', 'subscriptions', 'projects', 'employees', 'vault', 'guide', 'profile', 'settings'
 ]);
 
 function readStoredTab(): string {
@@ -49,7 +49,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Navbar onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)} />
+        <Navbar
+          onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onProfileClick={() => setActiveTab('profile')}
+        />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl mx-auto space-y-8">

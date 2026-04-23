@@ -5,6 +5,7 @@ import {
   getAccounts,
   regenerateBackupCodes,
   updateAccount,
+  revealAccountCredentials,
 } from './service';
 import type { CreateAccountPayload, UpdateAccountPayload } from './service';
 
@@ -46,6 +47,12 @@ export function useRegenerateBackupCodesMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: accountsQueryKey });
     },
+  });
+}
+
+export function useRevealAccountCredentialsMutation() {
+  return useMutation({
+    mutationFn: (id: string) => revealAccountCredentials(id),
   });
 }
 

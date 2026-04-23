@@ -51,3 +51,13 @@ export async function deleteTool(id: string): Promise<SoftwareTool> {
   const res = await apiClient.delete<ApiResponse<SoftwareTool>>(`/tools/${id}`);
   return res.data.data;
 }
+
+export interface ToolRevealedCredentials {
+  password?: string;
+  customFields?: Array<{ key: string; value: string }>;
+}
+
+export async function revealToolCredentials(id: string): Promise<ToolRevealedCredentials> {
+  const res = await apiClient.get<ApiResponse<ToolRevealedCredentials>>(`/tools/${id}/reveal`);
+  return res.data.data;
+}

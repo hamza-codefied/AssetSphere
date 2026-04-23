@@ -15,6 +15,7 @@ import {
   useDeleteSubscriptionMutation,
   useSubscriptionsQuery,
   useUpdateSubscriptionMutation,
+  useRevealSubscriptionCredentialsMutation,
 } from '../api/subscriptions';
 
 const statusVariant: Record<SubscriptionStatus, 'success' | 'warning' | 'danger' | 'default'> = {
@@ -50,7 +51,9 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
   const createSubscriptionMutation = useCreateSubscriptionMutation();
   const updateSubscriptionMutation = useUpdateSubscriptionMutation();
   const deleteSubscriptionMutation = useDeleteSubscriptionMutation();
+  const revealSubMutation = useRevealSubscriptionCredentialsMutation();
 
+  const [revealedSubPassword, setRevealedSubPassword] = useState<string | null>(null);
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
@@ -247,7 +250,7 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
                   <tr
                     key={sub.id}
                     className="hover:bg-accent/30 transition-colors group cursor-pointer"
-                    onClick={() => { setSelectedSub(sub); setIsAddMode(false); setIsModalOpen(true); }}
+                    onClick={() => { setSelectedSub(sub); setRevealedSubPassword(null); setIsAddMode(false); setIsModalOpen(true); }}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -536,7 +539,14 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Credentials</p>
                 {selectedSub.credentials.email && <CredentialField label="Email" value={selectedSub.credentials.email} isMasked={false} />}
-                <CredentialField label="Password" value={selectedSub.credentials.password} />
+                <CredentialField
+                  label="Password"
+                  value={revealedSubPassword ?? selectedSub.credentials.password}
+                  onReveal={can('vault.reveal_passwords') ? async () => {
+                    const revealed = await revealSubMutation.mutateAsync(selectedSub.id);
+                    if (revealed.password) setRevealedSubPassword(revealed.password);
+                  } : undefined}
+                />
               </div>
             )}
 

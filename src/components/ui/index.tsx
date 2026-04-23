@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Copy, Check, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Copy, Check, ChevronDown, Plus, Trash2, KeyRound } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -156,14 +156,44 @@ export const CustomCredentialFieldsEditor = ({
   );
 };
 
-export const CredentialField = ({ label, value, isMasked = true }: { label: string; value: string; type?: string; isMasked?: boolean }) => {
+export const CredentialField = ({
+  label,
+  value,
+  isMasked = true,
+  onReveal,
+}: {
+  label: string;
+  value: string;
+  type?: string;
+  isMasked?: boolean;
+  onReveal?: () => Promise<void>;
+}) => {
   const [visible, setVisible] = useState(!isMasked);
+  const [revealing, setRevealing] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const isStillMasked = value === '********';
+  const shouldUseRevealFirst = isMasked && isStillMasked && !!onReveal;
 
   const copy = () => {
     navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleEye = async () => {
+    if (shouldUseRevealFirst && onReveal) {
+      setRevealing(true);
+      try {
+        await onReveal();
+        // Once reveal succeeds, switch to normal eye toggle and show plain value.
+        setVisible(true);
+      } finally {
+        setRevealing(false);
+      }
+    } else {
+      setVisible(!visible);
+    }
   };
 
   return (
@@ -178,8 +208,23 @@ export const CredentialField = ({ label, value, isMasked = true }: { label: stri
         />
         <div className="flex items-center gap-1">
           {isMasked && (
-            <button onClick={() => setVisible(!visible)} className="p-1 hover:bg-white/10 rounded-md text-muted-foreground transition-colors">
-              {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            <button
+              onClick={() => { void handleEye(); }}
+              disabled={revealing}
+              className="p-1 hover:bg-white/10 rounded-md text-muted-foreground transition-colors disabled:opacity-50"
+            >
+              {revealing ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z" />
+                </svg>
+              ) : shouldUseRevealFirst ? (
+                <KeyRound className="w-4 h-4" />
+              ) : visible ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
             </button>
           )}
           <button onClick={copy} className="p-1 hover:bg-white/10 rounded-md text-muted-foreground transition-colors">

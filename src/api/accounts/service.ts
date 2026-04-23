@@ -56,3 +56,17 @@ export async function deleteAccount(id: string): Promise<Account> {
   const res = await apiClient.delete<ApiResponse<Account>>(`/accounts/${id}`);
   return res.data.data;
 }
+
+export interface AccountRevealedCredentials {
+  password?: string;
+  twoFactor?: {
+    secret?: string;
+    backupCodes?: string[];
+  };
+  customFields?: Array<{ key: string; value: string }>;
+}
+
+export async function revealAccountCredentials(id: string): Promise<AccountRevealedCredentials> {
+  const res = await apiClient.get<ApiResponse<AccountRevealedCredentials>>(`/accounts/${id}/reveal`);
+  return res.data.data;
+}

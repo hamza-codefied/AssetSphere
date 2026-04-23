@@ -53,3 +53,12 @@ export async function deleteSubscription(id: string): Promise<Subscription> {
   const res = await apiClient.delete<ApiResponse<Subscription>>(`/subscriptions/${id}`);
   return res.data.data;
 }
+
+export interface SubscriptionRevealedCredentials {
+  password?: string;
+}
+
+export async function revealSubscriptionCredentials(id: string): Promise<SubscriptionRevealedCredentials> {
+  const res = await apiClient.get<ApiResponse<SubscriptionRevealedCredentials>>(`/subscriptions/${id}/reveal`);
+  return res.data.data;
+}

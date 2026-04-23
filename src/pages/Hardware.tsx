@@ -10,6 +10,7 @@ import {
   useDeleteHardwareMutation,
   useHardwareQuery,
   useUpdateHardwareMutation,
+  useRevealHardwareCredentialsMutation,
 } from '../api/hardware';
 import { useEmployeesQuery } from '../api/employees';
 
@@ -31,6 +32,9 @@ export const Hardware = ({ state: _state }: { state: ReturnType<typeof useSystem
   const createHardwareMutation = useCreateHardwareMutation();
   const updateHardwareMutation = useUpdateHardwareMutation();
   const deleteHardwareMutation = useDeleteHardwareMutation();
+  const revealHardwareMutation = useRevealHardwareCredentialsMutation();
+
+  const [revealedHwCreds, setRevealedHwCreds] = useState<{ password?: string; pin?: string } | null>(null);
 
   const [selectedAsset, setSelectedAsset] = useState<HardwareAsset | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,6 +81,7 @@ export const Hardware = ({ state: _state }: { state: ReturnType<typeof useSystem
 
   const openDetails = (asset: HardwareAsset) => {
     setSelectedAsset(asset);
+    setRevealedHwCreds(null);
     setIsAddMode(false);
     setIsEditMode(false);
     setIsModalOpen(true);
@@ -405,7 +410,24 @@ export const Hardware = ({ state: _state }: { state: ReturnType<typeof useSystem
                   <ShieldOff className="w-4 h-4 text-primary" />
                   Security
                 </h3>
-                <CredentialField label="Device Password" value={selectedAsset.credentials.password} />
+                <CredentialField
+                  label="Device Password"
+                  value={revealedHwCreds?.password ?? selectedAsset.credentials.password}
+                  onReveal={can('vault.reveal_passwords') ? async () => {
+                    const revealed = await revealHardwareMutation.mutateAsync(selectedAsset.id);
+                    setRevealedHwCreds(revealed);
+                  } : undefined}
+                />
+                {selectedAsset.credentials.pin && (
+                  <CredentialField
+                    label="PIN"
+                    value={revealedHwCreds?.pin ?? selectedAsset.credentials.pin}
+                    onReveal={can('vault.reveal_passwords') ? async () => {
+                      const revealed = await revealHardwareMutation.mutateAsync(selectedAsset.id);
+                      setRevealedHwCreds(revealed);
+                    } : undefined}
+                  />
+                )}
               </div>
             )}
 

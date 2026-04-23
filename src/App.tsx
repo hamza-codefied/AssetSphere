@@ -8,6 +8,7 @@ import { Projects } from './pages/Projects';
 import { Employees } from './pages/Employees';
 import { Vault } from './pages/Vault';
 import { Guide } from './pages/Guide';
+import { Profile } from './pages/Profile';
 import { Login } from './pages/Login';
 import { useSystemState } from './hooks/useSystemState';
 import { AuthProvider, useAuth } from './auth/AuthContext';
@@ -62,6 +63,8 @@ function AuthenticatedApp() {
             return can('vault.view') ? <Vault state={state} /> : <AccessDenied />;
           case 'guide':
             return can('guide.view') ? <Guide /> : <AccessDenied />;
+          case 'profile':
+            return <Profile />;
           case 'settings':
             return can('settings.view') ? <SettingsPlaceholder /> : <AccessDenied />;
           default:

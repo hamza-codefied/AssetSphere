@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { assignTool, createTool, deleteTool, getTools, updateTool } from './service';
+import { assignTool, createTool, deleteTool, getTools, updateTool, revealToolCredentials } from './service';
 import type { AssignToolPayload, CreateToolPayload, UpdateToolPayload } from './service';
 
 export const toolsQueryKey = ['tools'] as const;
@@ -44,6 +44,12 @@ export function useAssignToolMutation() {
       void queryClient.invalidateQueries({ queryKey: toolsQueryKey });
       void queryClient.invalidateQueries({ queryKey: ['employees'] });
     },
+  });
+}
+
+export function useRevealToolCredentialsMutation() {
+  return useMutation({
+    mutationFn: (id: string) => revealToolCredentials(id),
   });
 }
 

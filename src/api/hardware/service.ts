@@ -62,3 +62,13 @@ export async function deleteHardware(id: string): Promise<HardwareAsset> {
   const res = await apiClient.delete<ApiResponse<HardwareAsset>>(`/hardware/${id}`);
   return res.data.data;
 }
+
+export interface HardwareRevealedCredentials {
+  password?: string;
+  pin?: string;
+}
+
+export async function revealHardwareCredentials(id: string): Promise<HardwareRevealedCredentials> {
+  const res = await apiClient.get<ApiResponse<HardwareRevealedCredentials>>(`/hardware/${id}/reveal`);
+  return res.data.data;
+}

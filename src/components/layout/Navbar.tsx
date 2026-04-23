@@ -4,9 +4,10 @@ import { roleConfig } from '../../auth/permissions';
 
 interface NavbarProps {
   onMenuClick?: () => void;
+  onProfileClick?: () => void;
 }
 
-export const Navbar = ({ onMenuClick }: NavbarProps) => {
+export const Navbar = ({ onMenuClick, onProfileClick }: NavbarProps) => {
   const { user, logout } = useAuth();
 
   const initials = user ? user.name.split(' ').map(n => n[0]).join('') : '??';
@@ -40,7 +41,11 @@ export const Navbar = ({ onMenuClick }: NavbarProps) => {
         
         <div className="h-8 w-px bg-border mx-2"></div>
         
-        <button className="flex items-center gap-3 p-1.5 hover:bg-accent rounded-xl transition-colors">
+        <button
+          className="flex items-center gap-3 p-1.5 hover:bg-accent rounded-xl transition-colors"
+          onClick={onProfileClick}
+          title="Open profile"
+        >
           <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-medium text-sm">
             {initials}
           </div>

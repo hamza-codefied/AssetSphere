@@ -16,7 +16,9 @@ import {
   useDeleteAccountMutation,
   useRegenerateBackupCodesMutation,
   useUpdateAccountMutation,
+  useRevealAccountCredentialsMutation,
 } from '../api/accounts';
+import type { AccountRevealedCredentials } from '../api/accounts';
 import { toApiError } from '../api/client';
 
 type TwoFactorMethod = 'Authenticator' | 'SMS' | 'Email';
@@ -61,6 +63,9 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
   const updateAccountMutation = useUpdateAccountMutation();
   const regenerateCodesMutation = useRegenerateBackupCodesMutation();
   const deleteAccountMutation = useDeleteAccountMutation();
+  const revealAccountMutation = useRevealAccountCredentialsMutation();
+
+  const [revealedAccCreds, setRevealedAccCreds] = useState<AccountRevealedCredentials | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
@@ -342,6 +347,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
             className="cursor-pointer hover:border-violet-500/50 transition-all border-l-4 border-l-violet-500"
             onClick={() => {
               setSelectedAccount(account);
+              setRevealedAccCreds(null);
               setIsAddMode(false);
               setIsModalOpen(true);
             }}
@@ -557,9 +563,24 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
               </h3>
               <div className="space-y-3">
                 <CredentialField label="Email / Username" value={selectedAccount.credentials.email || selectedAccount.email} isMasked={false} />
-                <CredentialField label="Password" value={selectedAccount.credentials.password || ''} />
-                {selectedAccount.credentials.customFields?.map((cf, i) => (
-                  <CredentialField key={`${cf.key}-${i}`} label={cf.key} value={cf.value} />
+                <CredentialField
+                  label="Password"
+                  value={revealedAccCreds?.password ?? selectedAccount.credentials.password ?? ''}
+                  onReveal={can('vault.reveal_passwords') ? async () => {
+                    const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
+                    setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                  } : undefined}
+                />
+                {(revealedAccCreds?.customFields ?? selectedAccount.credentials.customFields)?.map((cf, i) => (
+                  <CredentialField
+                    key={`${cf.key}-${i}`}
+                    label={cf.key}
+                    value={cf.value}
+                    onReveal={can('vault.reveal_passwords') && cf.value === '********' ? async () => {
+                      const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
+                      setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                    } : undefined}
+                  />
                 ))}
                 <p className="text-[10px] text-muted-foreground">Last updated: {selectedAccount.credentials.lastUpdated}</p>
               </div>
@@ -600,7 +621,14 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                       )}
                       {selectedAccount.credentials.twoFactor.secret && (
                         canReveal ? (
-                          <CredentialField label="TOTP Secret" value={selectedAccount.credentials.twoFactor.secret} />
+                          <CredentialField
+                            label="TOTP Secret"
+                            value={revealedAccCreds?.twoFactor?.secret ?? selectedAccount.credentials.twoFactor.secret}
+                            onReveal={async () => {
+                              const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
+                              setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                            }}
+                          />
                         ) : (
                           <div className="space-y-1.5">
                             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">TOTP Secret</label>
@@ -635,34 +663,50 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                           Backup Codes ({selectedAccount.credentials.twoFactor.backupCodes.length})
                         </p>
                         <div className="flex items-center gap-2">
-                          {canReveal && (
+                          {canReveal && !revealedAccCreds?.twoFactor?.backupCodes && (
                             <button
                               type="button"
-                              onClick={() => setBackupCodesVisible(v => !v)}
-                              className="text-[11px] font-semibold text-primary hover:underline"
+                              onClick={async () => {
+                                const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
+                                setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                                setBackupCodesVisible(true);
+                              }}
+                              disabled={revealAccountMutation.isPending}
+                              className="text-[11px] font-semibold text-primary hover:underline disabled:opacity-50"
                             >
-                              {backupCodesVisible ? 'Hide' : 'Reveal'}
+                              {revealAccountMutation.isPending ? 'Revealing...' : 'Reveal'}
                             </button>
                           )}
-                          {canReveal && backupCodesVisible && (
-                            <button
-                              type="button"
-                              onClick={() => copyBackupCodes(selectedAccount.credentials.twoFactor!.backupCodes!)}
-                              className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
-                            >
-                              {copiedCodes ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                              {copiedCodes ? 'Copied' : 'Copy all'}
-                            </button>
+                          {canReveal && revealedAccCreds?.twoFactor?.backupCodes && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setBackupCodesVisible(v => !v)}
+                                className="text-[11px] font-semibold text-primary hover:underline"
+                              >
+                                {backupCodesVisible ? 'Hide' : 'Show'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => copyBackupCodes(revealedAccCreds.twoFactor!.backupCodes!)}
+                                className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+                              >
+                                {copiedCodes ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                {copiedCodes ? 'Copied' : 'Copy all'}
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-1.5">
-                        {selectedAccount.credentials.twoFactor.backupCodes.map((code, idx) => (
+                        {selectedAccount.credentials.twoFactor.backupCodes.map((_, idx) => (
                           <div
                             key={idx}
                             className="bg-accent/60 rounded-lg px-2.5 py-1.5 text-xs font-mono text-center tracking-widest"
                           >
-                            {canReveal && backupCodesVisible ? code : '●●●● ●●●●'}
+                            {canReveal && backupCodesVisible && revealedAccCreds?.twoFactor?.backupCodes?.[idx]
+                              ? revealedAccCreds.twoFactor.backupCodes[idx]
+                              : '●●●● ●●●●'}
                           </div>
                         ))}
                       </div>

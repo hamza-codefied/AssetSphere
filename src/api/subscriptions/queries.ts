@@ -4,6 +4,7 @@ import {
   deleteSubscription,
   getSubscriptions,
   updateSubscription,
+  revealSubscriptionCredentials,
 } from './service';
 import type { CreateSubscriptionPayload, UpdateSubscriptionPayload } from './service';
 
@@ -35,6 +36,12 @@ export function useUpdateSubscriptionMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionsQueryKey });
     },
+  });
+}
+
+export function useRevealSubscriptionCredentialsMutation() {
+  return useMutation({
+    mutationFn: (id: string) => revealSubscriptionCredentials(id),
   });
 }
 

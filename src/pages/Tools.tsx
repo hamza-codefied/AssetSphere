@@ -15,6 +15,7 @@ import {
   useDeleteToolMutation,
   useToolsQuery,
   useUpdateToolMutation,
+  useRevealToolCredentialsMutation,
 } from '../api/tools';
 
 export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
@@ -29,6 +30,9 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
   const createToolMutation = useCreateToolMutation();
   const updateToolMutation = useUpdateToolMutation();
   const deleteToolMutation = useDeleteToolMutation();
+  const revealToolMutation = useRevealToolCredentialsMutation();
+
+  const [revealedToolCreds, setRevealedToolCreds] = useState<{ password?: string; customFields?: Array<{ key: string; value: string }> } | null>(null);
   const [selectedTool, setSelectedTool] = useState<SoftwareTool | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
@@ -214,6 +218,7 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
               className="group hover:border-indigo-500/50 transition-all flex flex-col justify-between"
               onClick={() => {
                 setSelectedTool(tool);
+                setRevealedToolCreds(null);
                 setIsAddMode(false);
                 setIsEditMode(false);
                 setIsModalOpen(true);
@@ -417,10 +422,25 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
                   <CredentialField label="Email" value={selectedTool.credentials.email} isMasked={false} />
                 )}
                 {selectedTool.credentials?.password && (
-                  <CredentialField label="Password" value={selectedTool.credentials.password} />
+                  <CredentialField
+                    label="Password"
+                    value={revealedToolCreds?.password ?? selectedTool.credentials.password}
+                    onReveal={can('vault.reveal_passwords') ? async () => {
+                      const revealed = await revealToolMutation.mutateAsync(selectedTool.id);
+                      setRevealedToolCreds(revealed);
+                    } : undefined}
+                  />
                 )}
-                {selectedTool.credentials?.customFields?.map((cf, i) => (
-                  <CredentialField key={`${cf.key}-${i}`} label={cf.key} value={cf.value} />
+                {(revealedToolCreds?.customFields ?? selectedTool.credentials?.customFields)?.map((cf, i) => (
+                  <CredentialField
+                    key={`${cf.key}-${i}`}
+                    label={cf.key}
+                    value={cf.value}
+                    onReveal={can('vault.reveal_passwords') && cf.value === '********' ? async () => {
+                      const revealed = await revealToolMutation.mutateAsync(selectedTool.id);
+                      setRevealedToolCreds(revealed);
+                    } : undefined}
+                  />
                 ))}
               </div>
             )}
