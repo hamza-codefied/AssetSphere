@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Modal, Button } from '../ui';
+import { useAuth } from '../../auth/AuthContext';
 
 interface MainLayoutProps {
   children: (activeTab: string) => React.ReactNode;
@@ -10,7 +12,7 @@ interface MainLayoutProps {
 const TAB_STORAGE_KEY = 'assetsphere-active-tab';
 
 const VALID_TABS = new Set([
-  'dashboard', 'hardware', 'tools', 'accounts', 'subscriptions', 'projects', 'employees', 'vault', 'guide', 'profile', 'settings'
+  'dashboard', 'hardware', 'tools', 'accounts', 'subscriptions', 'projects', 'employees', 'vault', 'guide', 'profile'
 ]);
 
 function readStoredTab(): string {
@@ -32,8 +34,10 @@ function persistTab(tab: string) {
 }
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
+  const { logout } = useAuth();
   const [activeTab, setActiveTabState] = useState(readStoredTab);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const setActiveTab = useCallback((tab: string) => {
     setActiveTabState(tab);
@@ -46,12 +50,14 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         collapsed={sidebarCollapsed} 
+        onLogoutClick={() => setIsLogoutModalOpen(true)}
       />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Navbar
           onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           onProfileClick={() => setActiveTab('profile')}
+          onLogoutClick={() => setIsLogoutModalOpen(true)}
         />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -70,6 +76,32 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           </div>
         </main>
       </div>
+
+      <Modal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        title="Confirm Logout"
+      >
+        <div className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to logout from AssetSphere?
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={() => setIsLogoutModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setIsLogoutModalOpen(false);
+                void logout();
+              }}
+            >
+              Logout
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

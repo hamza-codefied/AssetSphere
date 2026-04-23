@@ -1,14 +1,15 @@
-import { Search, Bell, Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { roleConfig } from '../../auth/permissions';
 
 interface NavbarProps {
   onMenuClick?: () => void;
   onProfileClick?: () => void;
+  onLogoutClick?: () => void;
 }
 
-export const Navbar = ({ onMenuClick, onProfileClick }: NavbarProps) => {
-  const { user, logout } = useAuth();
+export const Navbar = ({ onMenuClick, onProfileClick, onLogoutClick }: NavbarProps) => {
+  const { user } = useAuth();
 
   const initials = user ? user.name.split(' ').map(n => n[0]).join('') : '??';
   const roleMeta = user ? roleConfig[user.role] : null;
@@ -22,25 +23,9 @@ export const Navbar = ({ onMenuClick, onProfileClick }: NavbarProps) => {
         >
           <Menu className="w-5 h-5" />
         </button>
-        
-        <div className="relative max-w-md w-full hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search assets, tools, employees..."
-            className="w-full bg-accent/50 border-transparent focus:bg-accent focus:ring-1 focus:ring-primary h-10 pl-10 pr-4 rounded-xl text-sm transition-all"
-          />
-        </div>
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="p-2 hover:bg-accent rounded-xl relative text-muted-foreground transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-background"></span>
-        </button>
-        
-        <div className="h-8 w-px bg-border mx-2"></div>
-        
         <button
           className="flex items-center gap-3 p-1.5 hover:bg-accent rounded-xl transition-colors"
           onClick={onProfileClick}
@@ -62,9 +47,7 @@ export const Navbar = ({ onMenuClick, onProfileClick }: NavbarProps) => {
         </button>
 
         <button
-          onClick={() => {
-            void logout();
-          }}
+          onClick={onLogoutClick}
           className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-xl text-muted-foreground transition-colors ml-1"
           title="Sign Out"
         >

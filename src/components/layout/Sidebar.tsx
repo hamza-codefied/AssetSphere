@@ -7,7 +7,6 @@ import {
   ExternalLink,
   Users,
   Key,
-  Settings,
   LogOut,
   ChevronRight,
   ShieldCheck,
@@ -48,10 +47,11 @@ interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   collapsed?: boolean;
+  onLogoutClick?: () => void;
 }
 
-export const Sidebar = ({ activeTab, setActiveTab, collapsed }: SidebarProps) => {
-  const { can, logout } = useAuth();
+export const Sidebar = ({ activeTab, setActiveTab, collapsed, onLogoutClick }: SidebarProps) => {
+  const { can } = useAuth();
 
   const allMenuItems: { id: string; label: string; icon: React.ElementType; permission: Permission }[] = [
     { id: 'dashboard',     label: 'Dashboard',       icon: LayoutDashboard, permission: 'dashboard.view' },
@@ -94,18 +94,9 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed }: SidebarProps) =>
 
       <div className="p-4 border-t space-y-1">
         <SidebarItem
-          icon={Settings}
-          label="Settings"
-          isActive={activeTab === 'settings'}
-          onClick={() => setActiveTab('settings')}
-          collapsed={collapsed}
-        />
-        <SidebarItem
           icon={LogOut}
           label="Logout"
-          onClick={() => {
-            void logout();
-          }}
+          onClick={() => onLogoutClick?.()}
           collapsed={collapsed}
         />
       </div>
