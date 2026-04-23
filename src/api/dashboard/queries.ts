@@ -22,10 +22,11 @@ export function useDashboardAlertsQuery() {
   });
 }
 
-export function useDashboardActivityQuery(limit = 10) {
+export function useDashboardActivityQuery(limit = 10, enabled = true) {
   return useQuery({
     queryKey: dashboardActivityQueryKey(limit),
     queryFn: () => getDashboardActivity(limit),
     staleTime: 10_000,
+    enabled,
   });
 }

@@ -11,6 +11,7 @@ import {
   useDashboardAlertsQuery,
   useDashboardStatsQuery,
 } from '../api/dashboard';
+import { useAuth } from '../auth/AuthContext';
 
 const StatCard = ({
   title, value, icon: Icon, trend, color, sub
@@ -39,9 +40,11 @@ const StatCard = ({
 
 export const Dashboard = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
   void state;
+  const { can } = useAuth();
+  const canViewDashboardActivity = can('dashboard.activity');
   const statsQuery = useDashboardStatsQuery();
   const alertsQuery = useDashboardAlertsQuery();
-  const activityQuery = useDashboardActivityQuery(10);
+  const activityQuery = useDashboardActivityQuery(10, canViewDashboardActivity);
 
   const stats = statsQuery.data ?? {
     employees: 0,
@@ -85,7 +88,7 @@ export const Dashboard = ({ state }: { state: ReturnType<typeof useSystemState> 
         <p className="text-muted-foreground">Welcome back! Here's what's happening across your fleet.</p>
       </div>
 
-      {(statsQuery.isError || alertsQuery.isError || activityQuery.isError) && (
+      {(statsQuery.isError || alertsQuery.isError || (canViewDashboardActivity && activityQuery.isError)) && (
         <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 text-sm text-rose-500">
           Failed to load dashboard data:{' '}
           {toApiError(statsQuery.error) || toApiError(alertsQuery.error) || toApiError(activityQuery.error)}
@@ -120,47 +123,47 @@ export const Dashboard = ({ state }: { state: ReturnType<typeof useSystemState> 
         </div>
       )}
 
-      <div>
-        {/* Activity Feed — same max height as right column; scrolls inside */}
-        <div className="flex flex-col min-h-0 min-w-0">
-          <div className="flex items-center justify-between shrink-0 mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <History className="w-5 h-5 text-primary" />
-              Recent Activity
-            </h2>
-          </div>
-          <div className="space-y-3 overflow-y-auto overscroll-contain pr-1 -mr-1 min-h-0 max-h-112 rounded-2xl border border-border/60 [scrollbar-gutter:stable] custom-scrollbar">
-            {activityQuery.isLoading && (
-              <div className="p-4 rounded-2xl bg-card border text-sm text-muted-foreground">Loading activity...</div>
-            )}
-            {activities.slice(0, 8).map((activity) => (
-              <div key={activity.id} className="flex flex-col sm:flex-row gap-4 p-4 rounded-2xl bg-card border hover:border-primary/30 transition-colors relative">
-                <div className="flex gap-4 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
-                    {activity.module === 'Hardware' && <Monitor className="w-5 h-5" />}
-                    {activity.module === 'Tools' && <ExternalLink className="w-5 h-5" />}
-                    {activity.module === 'Accounts' && <ShieldCheck className="w-5 h-5" />}
-                    {activity.module === 'Subscriptions' && <CreditCard className="w-5 h-5" />}
-                    {activity.module === 'Projects' && <FolderOpen className="w-5 h-5" />}
-                    {activity.module === 'Employees' && <Users className="w-5 h-5" />}
+      {canViewDashboardActivity && (
+        <div>
+          {/* Activity Feed — same max height as right column; scrolls inside */}
+          <div className="flex flex-col min-h-0 min-w-0">
+            <div className="flex items-center justify-between shrink-0 mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <History className="w-5 h-5 text-primary" />
+                Recent Activity
+              </h2>
+            </div>
+            <div className="space-y-3 overflow-y-auto overscroll-contain pr-1 -mr-1 min-h-0 max-h-112 rounded-2xl border border-border/60 [scrollbar-gutter:stable] custom-scrollbar">
+              {activityQuery.isLoading && (
+                <div className="p-4 rounded-2xl bg-card border text-sm text-muted-foreground">Loading activity...</div>
+              )}
+              {activities.slice(0, 8).map((activity) => (
+                <div key={activity.id} className="flex flex-col sm:flex-row gap-4 p-4 rounded-2xl bg-card border hover:border-primary/30 transition-colors relative">
+                  <div className="flex gap-4 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
+                      {activity.module === 'Hardware' && <Monitor className="w-5 h-5" />}
+                      {activity.module === 'Tools' && <ExternalLink className="w-5 h-5" />}
+                      {activity.module === 'Accounts' && <ShieldCheck className="w-5 h-5" />}
+                      {activity.module === 'Subscriptions' && <CreditCard className="w-5 h-5" />}
+                      {activity.module === 'Projects' && <FolderOpen className="w-5 h-5" />}
+                      {activity.module === 'Employees' && <Users className="w-5 h-5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium pr-16 sm:pr-0 truncate sm:whitespace-normal">{activity.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {activity.userName} · {new Date(activity.timestamp).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium pr-16 sm:pr-0 truncate sm:whitespace-normal">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {activity.userName} · {new Date(activity.timestamp).toLocaleDateString()}
-                    </p>
+                  <div className="absolute top-4 right-4 sm:static shrink-0">
+                    <Badge variant="info" className="text-[10px] sm:text-xs">{activity.type}</Badge>
                   </div>
                 </div>
-                <div className="absolute top-4 right-4 sm:static shrink-0">
-                  <Badge variant="info" className="text-[10px] sm:text-xs">{activity.type}</Badge>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-
-
-      </div>
+      )}
     </div>
   );
 };

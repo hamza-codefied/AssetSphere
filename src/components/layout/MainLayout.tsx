@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Sidebar } from "./Sidebar";
 import { Navbar } from "./Navbar";
 import { AnimatePresence, motion } from "framer-motion";
-import { Modal, Button } from "../ui";
+import { Modal, Button, PasswordInput } from "../ui";
 import { useAuth } from "../../auth/AuthContext";
 
 interface MainLayoutProps {
@@ -43,17 +43,77 @@ function persistTab(tab: string) {
 }
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
-  const { logout } = useAuth();
+  const { user, login, logout } = useAuth();
   const [activeTab, setActiveTabState] = useState(readStoredTab);
   const [sidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isVaultAuthModalOpen, setIsVaultAuthModalOpen] = useState(false);
+  const [vaultPassword, setVaultPassword] = useState("");
+  const [vaultAuthError, setVaultAuthError] = useState<string | null>(null);
+  const [isVaultAuthPending, setIsVaultAuthPending] = useState(false);
+  const [pendingTabAfterAuth, setPendingTabAfterAuth] = useState<string | null>(
+    null,
+  );
+  const skipNextVaultGuardRef = useRef(false);
+
+  const shouldPromptVaultPassword =
+    user?.role === "admin" || user?.role === "pmo";
 
   const setActiveTab = useCallback((tab: string) => {
+    if (tab === "vault" && shouldPromptVaultPassword) {
+      setPendingTabAfterAuth("vault");
+      setVaultPassword("");
+      setVaultAuthError(null);
+      setIsVaultAuthModalOpen(true);
+      setIsMobileMenuOpen(false);
+      return;
+    }
     setActiveTabState(tab);
     persistTab(tab);
     setIsMobileMenuOpen(false);
-  }, []);
+  }, [shouldPromptVaultPassword]);
+
+  useEffect(() => {
+    if (!shouldPromptVaultPassword || activeTab !== "vault") return;
+    if (skipNextVaultGuardRef.current) {
+      skipNextVaultGuardRef.current = false;
+      return;
+    }
+    setPendingTabAfterAuth("vault");
+    setVaultPassword("");
+    setVaultAuthError(null);
+    setIsVaultAuthModalOpen(true);
+    setActiveTabState("dashboard");
+    persistTab("dashboard");
+  }, [activeTab, shouldPromptVaultPassword]);
+
+  const closeVaultAuthModal = () => {
+    setIsVaultAuthModalOpen(false);
+    setVaultPassword("");
+    setVaultAuthError(null);
+    setPendingTabAfterAuth(null);
+  };
+
+  const confirmVaultAccess = async () => {
+    if (!user || !pendingTabAfterAuth) return;
+    if (!vaultPassword.trim()) {
+      setVaultAuthError("Please enter your login password.");
+      return;
+    }
+    setVaultAuthError(null);
+    setIsVaultAuthPending(true);
+    const result = await login(user.email, vaultPassword);
+    setIsVaultAuthPending(false);
+    if (!result.success) {
+      setVaultAuthError(result.error ?? "Password verification failed.");
+      return;
+    }
+    skipNextVaultGuardRef.current = true;
+    setActiveTabState(pendingTabAfterAuth);
+    persistTab(pendingTabAfterAuth);
+    closeVaultAuthModal();
+  };
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
@@ -127,6 +187,57 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               }}
             >
               Logout
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isVaultAuthModalOpen}
+        onClose={closeVaultAuthModal}
+        title="Confirm Vault Access"
+      >
+        <div className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Re-enter your login password to open Credential Vault.
+          </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Account Password
+            </label>
+            <PasswordInput
+              value={vaultPassword}
+              onChange={(e) => setVaultPassword(e.target.value)}
+              placeholder="Enter your password"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void confirmVaultAccess();
+                }
+              }}
+            />
+          </div>
+          {vaultAuthError && (
+            <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/10 text-xs text-rose-600">
+              {vaultAuthError}
+            </div>
+          )}
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="outline"
+              onClick={closeVaultAuthModal}
+              disabled={isVaultAuthPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                void confirmVaultAccess();
+              }}
+              disabled={isVaultAuthPending}
+            >
+              {isVaultAuthPending ? "Verifying..." : "Continue"}
             </Button>
           </div>
         </div>

@@ -64,12 +64,15 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
   // Hardware + employees are API-backed. Tools/subscriptions/projects remain mock-backed
   // until those modules are integrated.
   const { subscriptions, projects } = state;
-  const { can } = useAuth();
+  const { can, user } = useAuth();
 
   const employeesQuery = useEmployeesQuery();
   const hardwareQuery = useHardwareQuery();
   const toolsQuery = useToolsQuery();
   const employees: Employee[] = employeesQuery.data ?? [];
+  const visibleEmployees = employees.filter(
+    (emp) => emp.id !== user?.id && emp.email !== user?.email,
+  );
   const hardware: HardwareAsset[] = hardwareQuery.data ?? [];
   const tools: SoftwareTool[] = toolsQuery.data ?? [];
   const createEmployeeMutation = useCreateEmployeeMutation();
@@ -372,21 +375,21 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
               </tr>
             </thead>
             <tbody className="divide-y">
-              {employeesQuery.isLoading && employees.length === 0 && (
+              {employeesQuery.isLoading && visibleEmployees.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading employees...</span>
                   </td>
                 </tr>
               )}
-              {!employeesQuery.isLoading && employees.length === 0 && (
+              {!employeesQuery.isLoading && visibleEmployees.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
-                    No employees yet. Click <span className="font-semibold">Onboard Employee</span> to add your first team member.
+                    No other employees found.
                   </td>
                 </tr>
               )}
-              {employees.map((emp) => (
+              {visibleEmployees.map((emp) => (
                 <tr
                   key={emp.id}
                   className="hover:bg-accent/30 transition-all group cursor-pointer"
