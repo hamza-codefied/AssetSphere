@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { Card, Badge } from '../components/ui';
-import { 
-  BookOpen, 
-  HelpCircle, 
-  Terminal, 
-  ShieldCheck, 
-  Zap, 
+import {
+  BookOpen,
+  HelpCircle,
+  Zap,
+  Users,
   ArrowRight,
-  Monitor,
-  Link as LinkIcon
+  ClipboardCheck,
+  Rocket,
+  Wrench,
+  FolderKanban,
+  Vault,
+  LayoutDashboard,
 } from 'lucide-react';
 
 export const Guide = () => {
@@ -16,9 +19,9 @@ export const Guide = () => {
 
   const sections = [
     { id: 'overview', title: 'System Overview', icon: BookOpen },
-    { id: 'identity', title: 'Identity Linking', icon: ShieldCheck },
-    { id: 'workflows', title: 'Key Workflows', icon: Zap },
-    { id: 'testing', title: 'Testing Guide', icon: Terminal },
+    { id: 'roles', title: 'Role Access Matrix', icon: Users },
+    { id: 'flows', title: 'Step-by-Step Flows', icon: Zap },
+    { id: 'module-playbook', title: 'Module Playbook', icon: Wrench },
   ];
 
   const GuideCard = ({ title, description, steps }: { title: string; description: string; steps: string[] }) => (
@@ -45,9 +48,9 @@ export const Guide = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <HelpCircle className="w-8 h-8 text-indigo-500" />
-            Knowledge Base
+            User Guide
           </h1>
-          <p className="text-muted-foreground">Master the AssetSphere platform with this interactive guide.</p>
+          <p className="text-muted-foreground">Complete operating guide for Admin, PMO, and Dev users.</p>
         </div>
       </div>
 
@@ -72,172 +75,200 @@ export const Guide = () => {
         <main className="lg:col-span-3 space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              <div className="prose prose-invert">
-                <h2 className="text-2xl font-bold">Welcome to AssetSphere</h2>
+              <div className="prose prose-invert max-w-none">
+                <h2 className="text-2xl font-bold">How AssetSphere Works</h2>
                 <p className="text-muted-foreground">
-                  AssetSphere is an enterprise-grade Internal Resource Management System designed to bridge the gap between 
-                  physical hardware, software tools, and digital identities.
+                  AssetSphere centralizes employee lifecycle, hardware, software tools,
+                  subscriptions, projects, and credential vault operations in one system.
+                  Admin creates employees (PMO/Dev), assigns resources, and tracks access from dashboard to vault.
                 </p>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="border-l-4 border-l-blue-500">
-                   <Monitor className="w-6 h-6 text-blue-500 mb-2" />
-                   <h4 className="font-bold">Hardware Fleet</h4>
-                   <p className="text-xs text-muted-foreground">Track laptops, monitors, and peripherals with real-time assignment status.</p>
-                </Card>
                 <Card className="border-l-4 border-l-violet-500">
-                   <ShieldCheck className="w-6 h-6 text-violet-500 mb-2" />
-                   <h4 className="font-bold">Central Identity</h4>
-                   <p className="text-xs text-muted-foreground">Manage core accounts (AWS, Google) in one place to avoid credential sprawl.</p>
+                  <FolderKanban className="w-6 h-6 text-violet-500 mb-2" />
+                  <h4 className="font-bold">Operations Modules</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Employees, Hardware, Tools, Subscriptions, Projects, Accounts.
+                  </p>
+                </Card>
+                <Card className="border-l-4 border-l-emerald-500">
+                  <Vault className="w-6 h-6 text-emerald-500 mb-2" />
+                  <h4 className="font-bold">Security + Visibility</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Dashboard alerts/activity and Vault for credential discovery and controlled reveal.
+                  </p>
                 </Card>
               </div>
-            </div>
-          )}
 
-          {activeTab === 'identity' && (
-            <div className="space-y-6">
-              <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-2xl p-6 flex gap-4">
-                 <LinkIcon className="w-8 h-8 text-indigo-500 shrink-0" />
-                 <div>
-                   <h3 className="font-bold text-lg">The "Linked Account" Concept</h3>
-                   <p className="text-sm text-muted-foreground mt-1">
-                     Instead of creating passwords for every single tool (Slack, Figma, GitHub), 
-                     AssetSphere encourages linking tools to a **Central Account**.
-                   </p>
-                 </div>
-              </div>
-              <div className="space-y-4">
-                <GuideCard 
-                  title="How it works"
-                  description="A tool inherits its security posture and credentials from the linked account."
-                  steps={[
-                    "Create a Central Account (e.g., Marketing Admin Gmail).",
-                    "Add a Tool (e.g., Buffer).",
-                    "Choose 'Link Central Account' and pick the Gmail.",
-                    "The tool now shows it's powered by that central identity."
-                  ]}
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'workflows' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <GuideCard 
-                title="Onboarding an Employee"
-                description="The standard flow for adding new team members."
+              <GuideCard
+                title="Recommended first-time setup"
+                description="Follow this exact sequence after first login."
                 steps={[
-                  "Go to 'Employees' and click 'Onboard'.",
-                  "Enter their details and role.",
-                  "Navigate to 'Hardware' and assign a laptop to them.",
-                  "Navigate to 'Tools' and provide access to core platforms."
-                ]}
-              />
-              <GuideCard 
-                title="Security Auditing"
-                description="How to verify system security."
-                steps={[
-                  "Use the 'Credential Vault' to find specific secrets.",
-                  "Toggle visibility to verify passwords.",
-                  "Check 'Security Alerts' on the Dashboard for weak links."
+                  'Login as Admin (CEO account).',
+                  'Create PMO and Dev employees in Employees module.',
+                  'Create Central Accounts (AWS, Gmail, domains, etc.).',
+                  'Add Hardware assets and assign to employees.',
+                  'Add Tools and link to Central Accounts where possible.',
+                  'Create Subscriptions and set assignment scope.',
+                  'Create Projects with PMO manager + Dev team members.',
+                  'Verify Dashboard stats/alerts and test Vault visibility.',
                 ]}
               />
             </div>
           )}
 
-          {activeTab === 'testing' && (
-            <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+          {activeTab === 'roles' && (
+            <div className="space-y-5">
               <div className="prose prose-invert max-w-none">
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <Terminal className="w-6 h-6 text-emerald-500" />
-                  Testing Protocols & Scenarios
-                </h2>
-                <p className="text-muted-foreground">Follow these step-by-step protocols to verify the system's recursive state engine.</p>
+                <h2 className="text-2xl font-bold">Role Access Matrix</h2>
+                <p className="text-muted-foreground">
+                  Permissions below are enforced by backend guards and used by frontend actions.
+                </p>
               </div>
 
-              <div className="space-y-6">
-                {/* Scenario 1 */}
-                <div className="p-6 rounded-2xl bg-slate-900 text-slate-100 shadow-xl border border-slate-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <Badge className="bg-emerald-500/20 text-emerald-400 border-none">Scenario: The Linking Chain</Badge>
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Identity Flow</span>
-                  </div>
-                  <div className="space-y-4 font-mono text-sm">
-                    <div className="flex gap-3">
-                      <span className="text-slate-500">01</span>
-                      <p>Go to <span className="text-indigo-400">"Central Accounts"</span> and click <span className="text-white">"Create Central Account"</span>. Use <span className="text-amber-300">"Demo AWS"</span>.</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="text-slate-500">02</span>
-                      <p>Go to <span className="text-indigo-400">"Tools"</span> and Add a new tool. Select <span className="text-amber-300">"Demo AWS"</span> in the dropdown.</p>
-                    </div>
-                    <div className="flex gap-3 border-t border-slate-800 pt-4">
-                      <span className="text-emerald-500">VERIFY</span>
-                      <p className="text-slate-300 italic">Open the tool details. It must show inherited credentials from Demo AWS.</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="text-rose-500">TEST</span>
-                      <p>Delete <span className="text-amber-300">"Demo AWS"</span> from Central Accounts.</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="text-emerald-500">RESULT</span>
-                      <p className="text-emerald-400">Check the Tool again. Link icon will disappear and system reverts to Manual Login.</p>
-                    </div>
-                  </div>
+              <Card className="space-y-3 border-l-4 border-l-rose-500">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold">Admin</h3>
+                  <Badge variant="danger">Full Access</Badge>
                 </div>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>- Can create/edit/delete everything across all modules.</li>
+                  <li>- Can onboard/edit/offboard/reactivate employees.</li>
+                  <li>- Can create/update/delete accounts, tools, hardware, subscriptions, projects.</li>
+                  <li>- Can reveal sensitive vault passwords/secrets.</li>
+                  <li>- Can view dashboard activity + all operational data.</li>
+                </ul>
+              </Card>
 
-                {/* Scenario 2 */}
-                <div className="p-6 rounded-2xl bg-slate-900 text-slate-100 shadow-xl border border-slate-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <Badge className="bg-blue-500/20 text-blue-400 border-none">Scenario: Deployment Audit</Badge>
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Hardware & Employee Flow</span>
-                  </div>
-                  <div className="space-y-4 font-mono text-sm">
-                    <div className="flex gap-3">
-                      <span className="text-slate-500">01</span>
-                      <p>Onboard an employee in <span className="text-indigo-400">"Employees"</span> named <span className="text-white">"Tester Joe"</span>.</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="text-slate-500">02</span>
-                      <p>In <span className="text-indigo-400">"Hardware"</span>, edit any <span className="text-amber-300">"MacBook"</span> and assign it to <span className="text-white">"Tester Joe"</span>.</p>
-                    </div>
-                    <div className="flex gap-3 border-t border-slate-800 pt-4 text-emerald-500">
-                      <span>VERIFY</span>
-                      <p className="text-slate-300 italic">Go to Joe's profile. Hardware count must now be 1. Asset status must be "Assigned".</p>
-                    </div>
-                  </div>
+              <Card className="space-y-3 border-l-4 border-l-amber-500">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold">PMO</h3>
+                  <Badge variant="warning">Operational Manager</Badge>
                 </div>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>- Can create/edit employees, hardware assignment, tools, subscriptions, and projects.</li>
+                  <li>- Can offboard employees (no hard delete on restricted modules).</li>
+                  <li>- Can view central accounts but cannot create/edit/delete accounts.</li>
+                  <li>- Can view vault listing but cannot reveal passwords.</li>
+                  <li>- Can use dashboard and activity feed for execution tracking.</li>
+                </ul>
+              </Card>
 
-                {/* Scenario 3 */}
-                <div className="p-6 rounded-2xl bg-slate-900 text-slate-100 shadow-xl border border-slate-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <Badge className="bg-violet-500/20 text-violet-400 border-none">Scenario: Security Vault Audit</Badge>
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Access Layer Flow</span>
-                  </div>
-                  <div className="space-y-4 font-mono text-sm">
-                    <div className="flex gap-3">
-                      <span className="text-slate-500">01</span>
-                      <p>Go to <span className="text-indigo-400">"Credential Vault"</span>.</p>
-                    </div>
-                    <div className="flex gap-3 text-white">
-                      <span>FLOW</span>
-                      <p>Use Search bar {"->"} Masking Eye {"->"} Copy Button.</p>
-                    </div>
-                    <div className="flex gap-3 border-t border-slate-800 pt-4 text-emerald-500">
-                      <span>VERIFY</span>
-                      <p className="text-slate-300 italic">System must provide unified access to secrets from ALL modules in one view.</p>
-                    </div>
-                  </div>
+              <Card className="space-y-3 border-l-4 border-l-blue-500">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold">Dev</h3>
+                  <Badge variant="info">Read Only</Badge>
                 </div>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>- Can view modules (employees, hardware, tools, subscriptions, projects, dashboard).</li>
+                  <li>- Cannot create/edit/delete/offboard resources.</li>
+                  <li>- Vault is listing-only (no secret reveal).</li>
+                  <li>- Best for execution visibility and dependency checks.</li>
+                </ul>
+              </Card>
+            </div>
+          )}
+
+          {activeTab === 'flows' && (
+            <div className="space-y-6">
+              <GuideCard
+                title="Flow 1: Employee Onboarding"
+                description="Create a new employee and prepare access baseline."
+                steps={[
+                  'Employees -> Onboard Employee.',
+                  'Fill name, email, role (PMO/Dev), department, password.',
+                  'Save and verify user appears in Employees table as Active.',
+                  'Open employee profile and confirm role/department details.',
+                ]}
+              />
+
+              <GuideCard
+                title="Flow 2: Asset + Tool Provisioning"
+                description="Assign hardware and software access to an employee."
+                steps={[
+                  'Hardware -> Add Asset (serial/type/optional credential).',
+                  'Edit asset and assign to employee.',
+                  'Tools -> Add tool, choose linked account or manual credentials.',
+                  'Assign tool to same employee and verify counts in Employees profile.',
+                ]}
+              />
+
+              <GuideCard
+                title="Flow 3: Subscription + Project Setup"
+                description="Attach commercial + project resources to delivery teams."
+                steps={[
+                  'Subscriptions -> create with renewal date and scope.',
+                  'Projects -> create project with PMO project manager.',
+                  'Add Dev team members (PM cannot be in member list).',
+                  'Link accounts/hardware/subscriptions and save.',
+                  'Open project details tabs (overview/team/credentials/resources) to verify all links.',
+                ]}
+              />
+
+              <GuideCard
+                title="Flow 4: Offboarding & Reactivation"
+                description="Securely offboard a user and optionally reactivate later."
+                steps={[
+                  'Open Employee Profile -> Begin Offboarding.',
+                  'Complete wizard steps: hardware return, access revoke, checklist.',
+                  'Confirm offboarding and verify employee becomes Inactive.',
+                  'If needed, Reactivate from profile to return status to Active.',
+                ]}
+              />
+
+              <GuideCard
+                title="Flow 5: Vault + Dashboard Monitoring"
+                description="Use security and executive visibility modules daily."
+                steps={[
+                  'Dashboard -> review counts, expiring items, and recent activity.',
+                  'Vault -> search by module/account/tool/project.',
+                  'Admin can use reveal for masked values; PMO/Dev should see masked-only output.',
+                  'Use alerts to prioritize renewals and access clean-up actions.',
+                ]}
+              />
+            </div>
+          )}
+
+          {activeTab === 'module-playbook' && (
+            <div className="space-y-4">
+              <div className="prose prose-invert max-w-none">
+                <h2 className="text-2xl font-bold">Module Playbook</h2>
+                <p className="text-muted-foreground">
+                  Run these checks whenever you deploy or demo the system.
+                </p>
               </div>
 
-              <div className="p-6 bg-primary/5 border-2 border-dashed border-primary/20 rounded-3xl flex flex-col items-center text-center gap-2">
-                 <p className="font-bold text-primary">Demo Ready Architecture</p>
-                 <p className="text-sm text-muted-foreground max-w-lg">
-                    This prototype simulates a full Postgres/Prisma backend using a centralized React State Hook. 
-                    Changes are persistent within the browser session for high-fidelity demos.
-                 </p>
-              </div>
+              <Card className="space-y-3">
+                <h3 className="font-bold flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-primary" /> Daily Operator Checklist</h3>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>- Confirm login and role-based navigation for Admin/PMO/Dev.</li>
+                  <li>- Verify employee list excludes admin from operational listing.</li>
+                  <li>- Verify hardware/tool assignments reflect inside employee profile.</li>
+                  <li>- Check one subscription status update and one project team update.</li>
+                  <li>- Check vault listing + reveal behavior by role.</li>
+                  <li>- Review dashboard activity after any create/update/delete action.</li>
+                </ul>
+              </Card>
+
+              <Card className="space-y-3">
+                <h3 className="font-bold flex items-center gap-2"><Rocket className="w-4 h-4 text-emerald-500" /> Release Validation Checklist</h3>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>- Auth: login, refresh, logout flow.</li>
+                  <li>- Employees: create, edit, offboard, reactivate, delete constraints.</li>
+                  <li>- Accounts: create, update, regenerate backup codes, delete.</li>
+                  <li>- Hardware/Tools: create, assign/unassign via edit, delete.</li>
+                  <li>- Subscriptions/Projects: create, update status/team/resources, delete.</li>
+                  <li>- Dashboard/Vault: data integrity + permission boundaries.</li>
+                </ul>
+              </Card>
+
+              <Card className="space-y-3 border-l-4 border-l-blue-500">
+                <h3 className="font-bold flex items-center gap-2"><LayoutDashboard className="w-4 h-4 text-blue-500" /> Permission Summary by Role</h3>
+                <p className="text-sm text-muted-foreground">
+                  Admin: full CUD + reveal secrets. PMO: operational C/U in most modules, view accounts, no reveal. Dev: view-only across modules.
+                </p>
+              </Card>
             </div>
           )}
 
