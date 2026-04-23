@@ -16,7 +16,7 @@ import {
   useDeleteAccountMutation,
   useRegenerateBackupCodesMutation,
   useUpdateAccountMutation,
-} from '../api/queries/accounts';
+} from '../api/accounts';
 import { toApiError } from '../api/client';
 
 type TwoFactorMethod = 'Authenticator' | 'SMS' | 'Email';

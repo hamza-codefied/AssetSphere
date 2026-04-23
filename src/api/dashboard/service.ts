@@ -1,7 +1,9 @@
-import { apiClient } from './client';
-import type { ActivityLog } from '../types';
+import { apiClient } from '../client';
+import type { ActivityLog } from '../../types';
 
-interface ApiResponse<T> { data: T }
+interface ApiResponse<T> {
+  data: T;
+}
 
 export interface DashboardStats {
   employees: number;
@@ -29,6 +31,8 @@ export async function getDashboardAlerts(): Promise<DashboardAlerts> {
 }
 
 export async function getDashboardActivity(limit = 10): Promise<ActivityLog[]> {
-  const res = await apiClient.get<ApiResponse<ActivityLog[]>>(`/dashboard/activity?limit=${limit}`);
+  const res = await apiClient.get<ApiResponse<ActivityLog[]>>(
+    `/dashboard/activity?limit=${limit}`,
+  );
   return res.data.data;
 }

@@ -5,12 +5,12 @@ import {
   deleteHardware,
   getHardware,
   updateHardware,
-} from '../hardware';
+} from './service';
 import type {
   AssignHardwarePayload,
   CreateHardwarePayload,
   UpdateHardwarePayload,
-} from '../hardware';
+} from './service';
 
 export const hardwareQueryKey = ['hardware'] as const;
 

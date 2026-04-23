@@ -8,16 +8,16 @@ import type { Project, ProjectStatus, ProjectRole, StandaloneCredential, Project
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
 import { toApiError } from '../api/client';
-import { useAccountsQuery } from '../api/queries/accounts';
-import { useEmployeesQuery } from '../api/queries/employees';
-import { useHardwareQuery } from '../api/queries/hardware';
-import { useSubscriptionsQuery } from '../api/queries/subscriptions';
+import { useAccountsQuery } from '../api/accounts';
+import { useEmployeesQuery } from '../api/employees';
+import { useHardwareQuery } from '../api/hardware';
+import { useSubscriptionsQuery } from '../api/subscriptions';
 import {
   useCreateProjectMutation,
   useDeleteProjectMutation,
   useProjectsQuery,
   useUpdateProjectMutation,
-} from '../api/queries/projects';
+} from '../api/projects';
 
 const statusVariant: Record<ProjectStatus, 'success' | 'default' | 'info'> = {
   'Active': 'success',

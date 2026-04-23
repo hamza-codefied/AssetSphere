@@ -6,8 +6,8 @@ import {
   getProjects,
   updateProject,
   updateProjectMembers,
-} from '../projects';
-import type { CreateProjectPayload, UpdateProjectPayload } from '../projects';
+} from './service';
+import type { CreateProjectPayload, UpdateProjectPayload } from './service';
 import type { ProjectMember, StandaloneCredential } from '../../types';
 
 export const projectsQueryKey = ['projects'] as const;
@@ -27,7 +27,8 @@ export function useCreateProjectMutation() {
 export function useUpdateProjectMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: UpdateProjectPayload }) => updateProject(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateProjectPayload }) =>
+      updateProject(id, payload),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: projectsQueryKey }),
   });
 }
@@ -35,7 +36,8 @@ export function useUpdateProjectMutation() {
 export function useUpdateProjectMembersMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, members }: { id: string; members: ProjectMember[] }) => updateProjectMembers(id, members),
+    mutationFn: ({ id, members }: { id: string; members: ProjectMember[] }) =>
+      updateProjectMembers(id, members),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: projectsQueryKey }),
   });
 }
@@ -43,8 +45,13 @@ export function useUpdateProjectMembersMutation() {
 export function useAddProjectCredentialMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, credential }: { id: string; credential: Omit<StandaloneCredential, 'id' | 'lastUpdated'> & { label: string } }) =>
-      addProjectCredential(id, credential),
+    mutationFn: ({
+      id,
+      credential,
+    }: {
+      id: string;
+      credential: Omit<StandaloneCredential, 'id' | 'lastUpdated'> & { label: string };
+    }) => addProjectCredential(id, credential),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: projectsQueryKey }),
   });
 }

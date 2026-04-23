@@ -10,7 +10,7 @@ import {
   useDashboardActivityQuery,
   useDashboardAlertsQuery,
   useDashboardStatsQuery,
-} from '../api/queries/dashboard';
+} from '../api/dashboard';
 
 const StatCard = ({
   title, value, icon: Icon, trend, color, sub

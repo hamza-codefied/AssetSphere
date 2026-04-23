@@ -8,14 +8,14 @@ import type { Subscription, SubscriptionStatus, BillingCycle, AssignmentScope } 
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
 import { toApiError } from '../api/client';
-import { useAccountsQuery } from '../api/queries/accounts';
-import { useEmployeesQuery } from '../api/queries/employees';
+import { useAccountsQuery } from '../api/accounts';
+import { useEmployeesQuery } from '../api/employees';
 import {
   useCreateSubscriptionMutation,
   useDeleteSubscriptionMutation,
   useSubscriptionsQuery,
   useUpdateSubscriptionMutation,
-} from '../api/queries/subscriptions';
+} from '../api/subscriptions';
 
 const statusVariant: Record<SubscriptionStatus, 'success' | 'warning' | 'danger' | 'default'> = {
   'Active': 'success',

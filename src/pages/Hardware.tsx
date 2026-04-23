@@ -10,8 +10,8 @@ import {
   useDeleteHardwareMutation,
   useHardwareQuery,
   useUpdateHardwareMutation,
-} from '../api/queries/hardware';
-import { useEmployeesQuery } from '../api/queries/employees';
+} from '../api/hardware';
+import { useEmployeesQuery } from '../api/employees';
 
 type ToastType = 'success' | 'error';
 interface ToastMessage {

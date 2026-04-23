@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { assignTool, createTool, deleteTool, getTools, updateTool } from '../tools';
-import type { AssignToolPayload, CreateToolPayload, UpdateToolPayload } from '../tools';
+import { assignTool, createTool, deleteTool, getTools, updateTool } from './service';
+import type { AssignToolPayload, CreateToolPayload, UpdateToolPayload } from './service';
 
 export const toolsQueryKey = ['tools'] as const;
 
@@ -26,7 +26,8 @@ export function useCreateToolMutation() {
 export function useUpdateToolMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: UpdateToolPayload }) => updateTool(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateToolPayload }) =>
+      updateTool(id, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: toolsQueryKey });
       void queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -37,7 +38,8 @@ export function useUpdateToolMutation() {
 export function useAssignToolMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: AssignToolPayload }) => assignTool(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: AssignToolPayload }) =>
+      assignTool(id, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: toolsQueryKey });
       void queryClient.invalidateQueries({ queryKey: ['employees'] });

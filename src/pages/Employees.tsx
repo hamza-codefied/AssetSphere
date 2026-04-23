@@ -16,9 +16,9 @@ import {
   useEmployeesQuery,
   useOffboardEmployeeMutation,
   useUpdateEmployeeMutation,
-} from '../api/queries/employees';
-import { useHardwareQuery } from '../api/queries/hardware';
-import { useToolsQuery } from '../api/queries/tools';
+} from '../api/employees';
+import { useHardwareQuery } from '../api/hardware';
+import { useToolsQuery } from '../api/tools';
 import type { AssignableEmployeeRole } from '../api/employees';
 import { toApiError } from '../api/client';
 import { roleConfig } from '../auth/permissions';

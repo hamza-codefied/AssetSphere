@@ -1,5 +1,5 @@
-import { apiClient } from './client';
-import type { Account, Credentials } from '../types';
+import { apiClient } from '../client';
+import type { Account, Credentials } from '../../types';
 
 interface ApiResponse<T> {
   data: T;
@@ -46,7 +46,9 @@ export async function updateAccount(id: string, payload: UpdateAccountPayload): 
 }
 
 export async function regenerateBackupCodes(id: string): Promise<Account> {
-  const res = await apiClient.post<ApiResponse<Account>>(`/accounts/${id}/regenerate-backup-codes`);
+  const res = await apiClient.post<ApiResponse<Account>>(
+    `/accounts/${id}/regenerate-backup-codes`,
+  );
   return res.data.data;
 }
 

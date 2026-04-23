@@ -8,14 +8,14 @@ import type { SoftwareTool } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
 import { toApiError } from '../api/client';
-import { useAccountsQuery } from '../api/queries/accounts';
-import { useEmployeesQuery } from '../api/queries/employees';
+import { useAccountsQuery } from '../api/accounts';
+import { useEmployeesQuery } from '../api/employees';
 import {
   useCreateToolMutation,
   useDeleteToolMutation,
   useToolsQuery,
   useUpdateToolMutation,
-} from '../api/queries/tools';
+} from '../api/tools';
 
 export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
   void state;

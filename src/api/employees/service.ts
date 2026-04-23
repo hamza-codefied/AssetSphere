@@ -1,5 +1,5 @@
-import { apiClient } from './client';
-import type { Employee, EmployeeRole } from '../types';
+import { apiClient } from '../client';
+import type { Employee, EmployeeRole } from '../../types';
 
 interface ApiResponse<T> {
   data: T;

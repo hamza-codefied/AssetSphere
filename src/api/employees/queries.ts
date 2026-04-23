@@ -5,8 +5,8 @@ import {
   getEmployees,
   offboardEmployee,
   updateEmployee,
-} from '../employees';
-import type { CreateEmployeePayload, UpdateEmployeePayload } from '../employees';
+} from './service';
+import type { CreateEmployeePayload, UpdateEmployeePayload } from './service';
 
 export const employeesQueryKey = ['employees'] as const;
 

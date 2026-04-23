@@ -1,5 +1,5 @@
-import { apiClient } from './client';
-import type { HardwareAsset, Credentials } from '../types';
+import { apiClient } from '../client';
+import type { HardwareAsset, Credentials } from '../../types';
 
 interface ApiResponse<T> {
   data: T;
@@ -39,13 +39,22 @@ export async function createHardware(payload: CreateHardwarePayload): Promise<Ha
   return res.data.data;
 }
 
-export async function updateHardware(id: string, payload: UpdateHardwarePayload): Promise<HardwareAsset> {
+export async function updateHardware(
+  id: string,
+  payload: UpdateHardwarePayload,
+): Promise<HardwareAsset> {
   const res = await apiClient.patch<ApiResponse<HardwareAsset>>(`/hardware/${id}`, payload);
   return res.data.data;
 }
 
-export async function assignHardware(id: string, payload: AssignHardwarePayload): Promise<HardwareAsset> {
-  const res = await apiClient.patch<ApiResponse<HardwareAsset>>(`/hardware/${id}/assign`, payload);
+export async function assignHardware(
+  id: string,
+  payload: AssignHardwarePayload,
+): Promise<HardwareAsset> {
+  const res = await apiClient.patch<ApiResponse<HardwareAsset>>(
+    `/hardware/${id}/assign`,
+    payload,
+  );
   return res.data.data;
 }
 

@@ -5,8 +5,8 @@ import {
   getAccounts,
   regenerateBackupCodes,
   updateAccount,
-} from '../accounts';
-import type { CreateAccountPayload, UpdateAccountPayload } from '../accounts';
+} from './service';
+import type { CreateAccountPayload, UpdateAccountPayload } from './service';
 
 export const accountsQueryKey = ['accounts'] as const;
 

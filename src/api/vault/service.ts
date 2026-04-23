@@ -1,6 +1,8 @@
-import { apiClient } from './client';
+import { apiClient } from '../client';
 
-interface ApiResponse<T> { data: T }
+interface ApiResponse<T> {
+  data: T;
+}
 
 export interface EncryptedValue {
   iv: string;

@@ -4,8 +4,8 @@ import {
   deleteSubscription,
   getSubscriptions,
   updateSubscription,
-} from '../subscriptions';
-import type { CreateSubscriptionPayload, UpdateSubscriptionPayload } from '../subscriptions';
+} from './service';
+import type { CreateSubscriptionPayload, UpdateSubscriptionPayload } from './service';
 
 export const subscriptionsQueryKey = ['subscriptions'] as const;
 

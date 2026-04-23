@@ -1,5 +1,5 @@
-import { apiClient } from './client';
-import type { SoftwareTool, Credentials } from '../types';
+import { apiClient } from '../client';
+import type { SoftwareTool, Credentials } from '../../types';
 
 interface ApiResponse<T> {
   data: T;

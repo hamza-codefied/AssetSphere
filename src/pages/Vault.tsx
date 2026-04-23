@@ -7,7 +7,7 @@ import {
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
 import { toApiError } from '../api/client';
-import { useRevealSecretMutation, useVaultQuery } from '../api/queries/vault';
+import { useRevealSecretMutation, useVaultQuery } from '../api/vault';
 import type { EncryptedValue } from '../api/vault';
 
 type VaultSection = 'all' | 'accounts' | 'hardware' | 'tools' | 'subscriptions' | 'projects';

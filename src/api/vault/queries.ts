@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { getVault, revealSecret } from '../vault';
-import type { EncryptedValue } from '../vault';
+import { getVault, revealSecret } from './service';
+import type { EncryptedValue } from './service';
 
 export const vaultQueryKey = ['vault'] as const;
 
