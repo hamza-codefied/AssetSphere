@@ -7,6 +7,17 @@ import {
 import type { Project, ProjectStatus, ProjectRole, StandaloneCredential, ProjectMember } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
+import { toApiError } from '../api/client';
+import { useAccountsQuery } from '../api/queries/accounts';
+import { useEmployeesQuery } from '../api/queries/employees';
+import { useHardwareQuery } from '../api/queries/hardware';
+import { useSubscriptionsQuery } from '../api/queries/subscriptions';
+import {
+  useCreateProjectMutation,
+  useDeleteProjectMutation,
+  useProjectsQuery,
+  useUpdateProjectMutation,
+} from '../api/queries/projects';
 
 const statusVariant: Record<ProjectStatus, 'success' | 'default' | 'info'> = {
   'Active': 'success',
@@ -25,8 +36,21 @@ const roleColor: Record<ProjectRole, string> = {
 };
 
 export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
-  const { projects, employees, accounts, hardware, subscriptions, addProject, updateProject, deleteProject } = state;
+  void state;
   const { can } = useAuth();
+  const projectsQuery = useProjectsQuery();
+  const employeesQuery = useEmployeesQuery();
+  const accountsQuery = useAccountsQuery();
+  const hardwareQuery = useHardwareQuery();
+  const subscriptionsQuery = useSubscriptionsQuery();
+  const projects = projectsQuery.data ?? [];
+  const employees = employeesQuery.data ?? [];
+  const accounts = accountsQuery.data ?? [];
+  const hardware = hardwareQuery.data ?? [];
+  const subscriptions = subscriptionsQuery.data ?? [];
+  const createProjectMutation = useCreateProjectMutation();
+  const updateProjectMutation = useUpdateProjectMutation();
+  const deleteProjectMutation = useDeleteProjectMutation();
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,6 +68,7 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
   const [fEndDate, setFEndDate] = useState('');
   const [fManagerId, setFManagerId] = useState('');
   const [fMembers, setFMembers] = useState<ProjectMember[]>([]);
+  const [fNewMemberId, setFNewMemberId] = useState('');
   const [fLinkedAccountIds, setFLinkedAccountIds] = useState<string[]>([]);
   const [fHardwareIds, setFHardwareIds] = useState<string[]>([]);
   const [fSubscriptionIds, setFSubscriptionIds] = useState<string[]>([]);
@@ -60,7 +85,7 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
   const resetForm = () => {
     setFName(''); setFClient(''); setFDescription(''); setFStatus('Active');
     setFStartDate(''); setFEndDate(''); setFManagerId('');
-    setFMembers([]); setFLinkedAccountIds([]); setFHardwareIds([]);
+    setFMembers([]); setFNewMemberId(''); setFLinkedAccountIds([]); setFHardwareIds([]);
     setFSubscriptionIds([]); setFStandaloneCredentials([]); setFNotes('');
     resetCredForm();
     setIsAddMode(false); setIsModalOpen(false); setSelectedProject(null);
@@ -72,24 +97,28 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
     setNewCredUrl(''); setNewCredNotes('');
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!fName.trim() || !fClient.trim()) return;
-    addProject({
-      name: fName.trim(),
-      clientName: fClient.trim(),
-      description: fDescription.trim() || undefined,
-      status: fStatus,
-      startDate: fStartDate || new Date().toISOString().split('T')[0],
-      endDate: fEndDate || undefined,
-      projectManager: fManagerId || undefined,
-      members: fMembers,
-      linkedAccountIds: fLinkedAccountIds,
-      hardwareIds: fHardwareIds,
-      subscriptionIds: fSubscriptionIds,
-      standaloneCredentials: fStandaloneCredentials,
-      notes: fNotes.trim() || undefined,
-    });
-    resetForm();
+    try {
+      await createProjectMutation.mutateAsync({
+        name: fName.trim(),
+        clientName: fClient.trim(),
+        description: fDescription.trim() || undefined,
+        status: fStatus,
+        startDate: fStartDate || new Date().toISOString().split('T')[0],
+        endDate: fEndDate || undefined,
+        projectManager: fManagerId || undefined,
+        members: fMembers,
+        linkedAccountIds: fLinkedAccountIds,
+        hardwareIds: fHardwareIds,
+        subscriptionIds: fSubscriptionIds,
+        standaloneCredentials: fStandaloneCredentials,
+        notes: fNotes.trim() || undefined,
+      });
+      resetForm();
+    } catch {
+      // non-blocking; surfaced through list/error states
+    }
   };
 
   const addStandaloneCred = () => {
@@ -107,12 +136,16 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
     resetCredForm();
   };
 
-  const toggleMember = (empId: string) => {
-    setFMembers(prev => {
-      const exists = prev.find(m => m.employeeId === empId);
-      if (exists) return prev.filter(m => m.employeeId !== empId);
-      return [...prev, { employeeId: empId, role: 'Developer' }];
+  const addMember = () => {
+    if (!fNewMemberId) return;
+    setFMembers((prev) => {
+      if (prev.some((member) => member.employeeId === fNewMemberId)) return prev;
+      return [...prev, { employeeId: fNewMemberId, role: 'Developer' }];
     });
+    setFNewMemberId('');
+  };
+  const removeMember = (empId: string) => {
+    setFMembers((prev) => prev.filter((member) => member.employeeId !== empId));
   };
   const updateMemberRole = (empId: string, role: ProjectRole) => {
     setFMembers(prev => prev.map(m => m.employeeId === empId ? { ...m, role } : m));
@@ -129,6 +162,14 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
   });
 
   const getEmployee = (id?: string) => employees.find(e => e.id === id);
+  const activePmoEmployees = employees.filter((employee) => employee.status === 'Active' && employee.role === 'pmo');
+  const availableTeamMembers = employees.filter(
+    (employee) =>
+      employee.status === 'Active' &&
+      employee.role === 'dev' &&
+      employee.id !== fManagerId &&
+      !fMembers.some((member) => member.employeeId === employee.id),
+  );
 
   return (
     <div className="space-y-6">
@@ -144,6 +185,12 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
           </Button>
         )}
       </div>
+
+      {projectsQuery.isError && (
+        <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 text-sm text-rose-500">
+          Failed to load projects: {toApiError(projectsQuery.error)}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -251,29 +298,61 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Project Manager</label>
-              <CustomSelect value={fManagerId} onChange={setFManagerId} placeholder="Select project manager..."
-                options={[{ value: '', label: 'None' }, ...employees.filter(e => e.status === 'Active').map(e => ({ value: e.id, label: e.name }))]}
+              <CustomSelect
+                value={fManagerId}
+                onChange={(value) => {
+                  setFManagerId(value);
+                  if (value) {
+                    setFMembers((prev) => prev.filter((member) => member.employeeId !== value));
+                  }
+                }}
+                placeholder="Select PMO project manager..."
+                options={[{ value: '', label: 'None' }, ...activePmoEmployees.map((e) => ({ value: e.id, label: e.name }))]}
               />
             </div>
 
             {/* Team Members */}
             <div className="space-y-3">
               <label className="text-sm font-medium">Team Members</label>
-              <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto custom-scrollbar">
-                {employees.filter(e => e.status === 'Active').map(emp => {
-                  const member = fMembers.find(m => m.employeeId === emp.id);
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <CustomSelect
+                    value={fNewMemberId}
+                    onChange={setFNewMemberId}
+                    placeholder="Select team member..."
+                    options={[
+                      { value: '', label: 'Select employee' },
+                      ...availableTeamMembers.map((employee) => ({ value: employee.id, label: employee.name })),
+                    ]}
+                  />
+                </div>
+                <Button type="button" variant="outline" onClick={addMember} disabled={!fNewMemberId}>
+                  Add
+                </Button>
+              </div>
+              <div className="space-y-2 max-h-36 overflow-y-auto custom-scrollbar">
+                {fMembers.map((member) => {
+                  const emp = employees.find((employee) => employee.id === member.employeeId);
+                  if (!emp) return null;
                   return (
-                    <div key={emp.id} className={`p-2 rounded-xl border transition-all ${member ? 'bg-primary/10 border-primary/30' : 'bg-accent/40 border-transparent'}`}>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={!!member} onChange={() => toggleMember(emp.id)} className="accent-primary" />
-                        <span className="text-sm font-medium truncate">{emp.name}</span>
-                      </label>
-                      {member && (
-                        <select value={member.role} onChange={e => updateMemberRole(emp.id, e.target.value as ProjectRole)}
-                          className="w-full mt-1 bg-accent text-xs rounded-lg px-2 py-1 border-none outline-none">
-                          {PROJECT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                      )}
+                    <div key={member.employeeId} className="p-2 rounded-xl border bg-primary/10 border-primary/30 flex items-center gap-2">
+                      <span className="text-sm font-medium flex-1 truncate">{emp.name}</span>
+                      <select
+                        value={member.role}
+                        onChange={(e) => updateMemberRole(member.employeeId, e.target.value as ProjectRole)}
+                        className="bg-accent text-xs rounded-lg px-2 py-1 border-none outline-none"
+                      >
+                        {PROJECT_ROLES.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeMember(member.employeeId)}
+                        className="text-destructive hover:bg-destructive/10 p-1 rounded-lg"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   );
                 })}
@@ -403,7 +482,12 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Update Status</p>
                       <div className="flex gap-2">
                         {(['Active', 'Completed', 'Archived'] as ProjectStatus[]).map(s => (
-                          <button key={s} onClick={() => { updateProject(selectedProject.id, { status: s }); setSelectedProject({ ...selectedProject, status: s }); }}
+                          <button
+                            key={s}
+                            onClick={() => {
+                              void updateProjectMutation.mutateAsync({ id: selectedProject.id, payload: { status: s } });
+                              setSelectedProject({ ...selectedProject, status: s });
+                            }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${selectedProject.status === s ? 'bg-primary text-primary-foreground border-primary' : 'bg-accent/40 border-border hover:bg-accent'}`}
                           >{s}</button>
                         ))}
@@ -534,7 +618,14 @@ export const Projects = ({ state }: { state: ReturnType<typeof useSystemState> }
             <div className="flex gap-3 pt-2 border-t">
               <Button variant="outline" className="flex-1" onClick={resetForm}>Close</Button>
               {can('projects.delete') && (
-                <Button variant="danger" className="flex-1" onClick={() => { deleteProject(selectedProject.id); resetForm(); }}>
+                <Button
+                  variant="danger"
+                  className="flex-1"
+                  onClick={() => {
+                    void deleteProjectMutation.mutateAsync(selectedProject.id);
+                    resetForm();
+                  }}
+                >
                   <Trash2 className="w-4 h-4" /> Delete
                 </Button>
               )}

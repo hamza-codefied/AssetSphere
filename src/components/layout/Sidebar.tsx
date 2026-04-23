@@ -103,7 +103,9 @@ export const Sidebar = ({ activeTab, setActiveTab, collapsed }: SidebarProps) =>
         <SidebarItem
           icon={LogOut}
           label="Logout"
-          onClick={logout}
+          onClick={() => {
+            void logout();
+          }}
           collapsed={collapsed}
         />
       </div>

@@ -1,12 +1,17 @@
-import { useState, createContext, useContext } from 'react';
+import { useEffect, useState, createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AuthUser, Permission, UserRole } from './permissions';
-import { mockUsers, hasPermission } from './permissions';
+import { hasPermission } from './permissions';
+import { authLogin, authLogout, authMe } from '../api/auth';
+import { toApiError } from '../api/client';
+import { tokenStorage } from './tokenStorage';
 
 interface AuthContextType {
   user: AuthUser | null;
-  login: (email: string, password: string) => { success: boolean; error?: string };
-  logout: () => void;
+  isAuthLoading: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   can: (permission: Permission) => boolean;
   isRole: (role: UserRole) => boolean;
 }
@@ -22,12 +27,7 @@ function loadStoredUser(): AuthUser | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AuthUser;
     if (!parsed?.id || !parsed?.email || !parsed?.role) return null;
-    const match = mockUsers.find(
-      (u) =>
-        u.user.id === parsed.id &&
-        u.user.email.toLowerCase() === String(parsed.email).toLowerCase()
-    );
-    return match ? match.user : null;
+    return parsed;
   } catch {
     return null;
   }
@@ -43,21 +43,66 @@ function persistUser(next: AuthUser | null) {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(loadStoredUser);
+  const hasToken = Boolean(tokenStorage.getAccessToken());
 
-  const login = (email: string, password: string): { success: boolean; error?: string } => {
-    const found = mockUsers.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (found) {
-      setUser(found.user);
-      persistUser(found.user);
-      return { success: true };
+  const meQuery = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: authMe,
+    enabled: hasToken,
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (hasToken && meQuery.data && (!user || user.id !== meQuery.data.id)) {
+      setUser(meQuery.data);
+      persistUser(meQuery.data);
     }
-    return { success: false, error: 'Invalid email or password.' };
+  }, [hasToken, meQuery.data, user]);
+
+  useEffect(() => {
+    if (meQuery.isError && hasToken) {
+      tokenStorage.clearTokens();
+      if (user) {
+        setUser(null);
+        persistUser(null);
+      }
+    }
+  }, [hasToken, meQuery.isError, user]);
+
+  const login = async (
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const data = await authLogin(email, password);
+      tokenStorage.setTokens({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      });
+      setUser(data.user);
+      persistUser(data.user);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: toApiError(error) };
+    }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await authLogout();
+    } catch {
+      // clear local state even if server session cleanup fails
+    }
+
+    // Clear all persisted client auth/session data.
+    tokenStorage.clearTokens();
+    localStorage.clear();
+    sessionStorage.clear();
+    queryClient.removeQueries({ queryKey: ['auth'] });
+
     setUser(null);
     persistUser(null);
   };
@@ -73,7 +118,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, can, isRole }}>
+    <AuthContext.Provider value={{ user, isAuthLoading: meQuery.isLoading, login, logout, can, isRole }}>
       {children}
     </AuthContext.Provider>
   );

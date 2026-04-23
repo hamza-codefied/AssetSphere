@@ -5,6 +5,12 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useSystemState } from '../hooks/useSystemState';
+import { toApiError } from '../api/client';
+import {
+  useDashboardActivityQuery,
+  useDashboardAlertsQuery,
+  useDashboardStatsQuery,
+} from '../api/queries/dashboard';
 
 const StatCard = ({
   title, value, icon: Icon, trend, color, sub
@@ -31,51 +37,45 @@ const StatCard = ({
   </Card>
 );
 
-const daysUntil = (dateStr: string) =>
-  Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
-
 export const Dashboard = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
-  const { employees, hardware, tools, accounts, activities, subscriptions, projects } = state;
+  void state;
+  const statsQuery = useDashboardStatsQuery();
+  const alertsQuery = useDashboardAlertsQuery();
+  const activityQuery = useDashboardActivityQuery(10);
 
-  // Real expiry alerts
-  const expiringTools = tools.filter(t => t.expiryDate && daysUntil(t.expiryDate) <= 30 && daysUntil(t.expiryDate) >= 0);
-  const expiredTools = tools.filter(t => t.expiryDate && daysUntil(t.expiryDate) < 0);
-  const expiringSubscriptions = subscriptions.filter(s => s.status === 'Expiring Soon');
-  const expiredSubscriptions = subscriptions.filter(s => s.status === 'Expired');
-  const accountsWithout2FA = accounts.filter(a => a.status === 'Active' && !a.credentials.twoFactor);
-  const availableHardware = hardware.filter(h => h.status === 'Available').length;
-  const activeProjects = projects.filter(p => p.status === 'Active').length;
-  const monthlyCost = subscriptions
-    .filter(s => s.status !== 'Cancelled' && s.status !== 'Expired')
-    .reduce((sum, s) => {
-      if (s.billingCycle === 'Monthly') return sum + s.cost;
-      if (s.billingCycle === 'Annual') return sum + s.cost / 12;
-      if (s.billingCycle === 'Quarterly') return sum + s.cost / 3;
-      return sum;
-    }, 0);
+  const stats = statsQuery.data ?? {
+    employees: 0,
+    hardware: 0,
+    tools: 0,
+    accounts: 0,
+    subscriptions: 0,
+    projects: 0,
+  };
+  const alertsData = alertsQuery.data ?? {
+    expiringTools: [],
+    expiringSubscriptions: [],
+    accountsWithout2FA: [],
+  };
+  const activities = activityQuery.data ?? [];
+
+  const expiringTools = alertsData.expiringTools;
+  const expiringSubscriptions = alertsData.expiringSubscriptions;
+  const accountsWithout2FA = alertsData.accountsWithout2FA;
 
   interface AlertItem { color: string; text: ReactElement; severity: 'high' | 'medium' | 'low' }
-  const alerts: AlertItem[] = [];
+  const alertItems: AlertItem[] = [];
 
-  expiredTools.forEach(t => alerts.push({
-    severity: 'high', color: 'bg-rose-500',
-    text: <p className="text-sm">Tool <span className="font-semibold">{t.name}</span> has expired. Please renew or remove.</p>
-  }));
-  expiredSubscriptions.forEach(s => alerts.push({
-    severity: 'high', color: 'bg-rose-500',
-    text: <p className="text-sm">Subscription <span className="font-semibold">{s.name}</span> has expired.</p>
-  }));
-  expiringTools.forEach(t => alerts.push({
+  expiringTools.forEach((t: any) => alertItems.push({
     severity: 'medium', color: 'bg-amber-500',
-    text: <p className="text-sm">Tool <span className="font-semibold">{t.name}</span> expires in {daysUntil(t.expiryDate!)} days.</p>
+    text: <p className="text-sm">Tool <span className="font-semibold">{String(t.name ?? 'Unknown')}</span> expires soon.</p>
   }));
-  expiringSubscriptions.forEach(s => alerts.push({
+  expiringSubscriptions.forEach((s: any) => alertItems.push({
     severity: 'medium', color: 'bg-amber-500',
-    text: <p className="text-sm">Subscription <span className="font-semibold">{s.name}</span> expires in {daysUntil(s.renewalDate)} days.</p>
+    text: <p className="text-sm">Subscription <span className="font-semibold">{String(s.name ?? 'Unknown')}</span> requires attention.</p>
   }));
-  accountsWithout2FA.forEach(a => alerts.push({
+  accountsWithout2FA.forEach((a: any) => alertItems.push({
     severity: 'low', color: 'bg-blue-500',
-    text: <p className="text-sm">2FA is not enabled on account <span className="font-semibold">{a.name}</span>.</p>
+    text: <p className="text-sm">2FA is not enabled on account <span className="font-semibold">{String(a.name ?? 'Unknown')}</span>.</p>
   }));
 
   return (
@@ -85,30 +85,54 @@ export const Dashboard = ({ state }: { state: ReturnType<typeof useSystemState> 
         <p className="text-muted-foreground">Welcome back! Here's what's happening across your fleet.</p>
       </div>
 
+      {(statsQuery.isError || alertsQuery.isError || activityQuery.isError) && (
+        <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 text-sm text-rose-500">
+          Failed to load dashboard data:{' '}
+          {toApiError(statsQuery.error) || toApiError(alertsQuery.error) || toApiError(activityQuery.error)}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <StatCard title="Total Hardware" value={hardware.length} icon={Monitor} sub={`${availableHardware} available`} color="bg-blue-500" />
-        <StatCard title="Active Tools" value={tools.filter(t => t.status === 'Active').length} icon={ExternalLink} sub={expiredTools.length > 0 ? `${expiredTools.length} expired` : undefined} color="bg-indigo-500" />
-        <StatCard title="Subscriptions" value={subscriptions.filter(s => s.status === 'Active' || s.status === 'Expiring Soon').length} icon={CreditCard} sub={`~$${monthlyCost.toFixed(0)}/mo spend`} color="bg-teal-500" />
-        <StatCard title="Active Projects" value={activeProjects} icon={FolderOpen} sub={`${projects.length} total`} color="bg-orange-500" />
+        <StatCard title="Total Hardware" value={stats.hardware} icon={Monitor} color="bg-blue-500" />
+        <StatCard title="Active Tools" value={stats.tools} icon={ExternalLink} color="bg-indigo-500" />
+        <StatCard title="Subscriptions" value={stats.subscriptions} icon={CreditCard} color="bg-teal-500" />
+        <StatCard title="Active Projects" value={stats.projects} icon={FolderOpen} color="bg-orange-500" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <StatCard title="Central Accounts" value={accounts.length} icon={ShieldCheck} color="bg-violet-500" />
-        <StatCard title="Total Employees" value={employees.filter(e => e.status === 'Active').length} icon={Users} sub={`${employees.filter(e => e.status === 'Inactive').length} inactive`} color="bg-slate-500" />
+        <StatCard title="Central Accounts" value={stats.accounts} icon={ShieldCheck} color="bg-violet-500" />
+        <StatCard title="Total Employees" value={stats.employees} icon={Users} color="bg-slate-500" />
         <StatCard title="Expiring Soon" value={expiringTools.length + expiringSubscriptions.length} icon={Clock} color="bg-amber-500" />
-        <StatCard title="Security Issues" value={accountsWithout2FA.length + expiredTools.length + expiredSubscriptions.length} icon={AlertTriangle} color="bg-rose-500" />
+        <StatCard title="Security Issues" value={accountsWithout2FA.length} icon={AlertTriangle} color="bg-rose-500" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 lg:items-stretch">
+      {alertItems.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-bold">Alerts</h2>
+          <div className="space-y-2">
+            {alertItems.slice(0, 6).map((item, index) => (
+              <div key={`alert-${index}`} className="p-3 rounded-xl border bg-card flex items-start gap-3">
+                <span className={`mt-1 w-2 h-2 rounded-full ${item.color}`} />
+                <div className="text-sm">{item.text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
         {/* Activity Feed — same max height as right column; scrolls inside */}
-        <div className="lg:col-span-12 flex flex-col min-h-0 min-w-0">
+        <div className="flex flex-col min-h-0 min-w-0">
           <div className="flex items-center justify-between shrink-0 mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <History className="w-5 h-5 text-primary" />
               Recent Activity
             </h2>
           </div>
-          <div className="space-y-3 overflow-y-auto overscroll-contain pr-1 -mr-1 min-h-0 max-h-[min(28rem,calc(100vh-20rem))] rounded-2xl border border-transparent [scrollbar-gutter:stable]">
+          <div className="space-y-3 overflow-y-auto overscroll-contain pr-1 -mr-1 min-h-0 max-h-112 rounded-2xl border border-border/60 [scrollbar-gutter:stable] custom-scrollbar">
+            {activityQuery.isLoading && (
+              <div className="p-4 rounded-2xl bg-card border text-sm text-muted-foreground">Loading activity...</div>
+            )}
             {activities.slice(0, 8).map((activity) => (
               <div key={activity.id} className="flex gap-4 p-4 rounded-2xl bg-card border hover:border-primary/30 transition-colors">
                 <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">

@@ -7,6 +7,15 @@ import {
 import type { Subscription, SubscriptionStatus, BillingCycle, AssignmentScope } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
+import { toApiError } from '../api/client';
+import { useAccountsQuery } from '../api/queries/accounts';
+import { useEmployeesQuery } from '../api/queries/employees';
+import {
+  useCreateSubscriptionMutation,
+  useDeleteSubscriptionMutation,
+  useSubscriptionsQuery,
+  useUpdateSubscriptionMutation,
+} from '../api/queries/subscriptions';
 
 const statusVariant: Record<SubscriptionStatus, 'success' | 'warning' | 'danger' | 'default'> = {
   'Active': 'success',
@@ -30,8 +39,17 @@ const formatCurrency = (amount: number, cycle: BillingCycle) =>
   `$${amount.toLocaleString()}/${cycle === 'Monthly' ? 'mo' : cycle === 'Annual' ? 'yr' : cycle === 'Quarterly' ? 'qtr' : 'once'}`;
 
 export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
-  const { subscriptions, employees, accounts, addSubscription, updateSubscription, deleteSubscription } = state;
+  void state;
   const { can } = useAuth();
+  const subscriptionsQuery = useSubscriptionsQuery();
+  const employeesQuery = useEmployeesQuery();
+  const accountsQuery = useAccountsQuery();
+  const subscriptions = subscriptionsQuery.data ?? [];
+  const employees = employeesQuery.data ?? [];
+  const accounts = accountsQuery.data ?? [];
+  const createSubscriptionMutation = useCreateSubscriptionMutation();
+  const updateSubscriptionMutation = useUpdateSubscriptionMutation();
+  const deleteSubscriptionMutation = useDeleteSubscriptionMutation();
 
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,30 +90,40 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
     return 'Active';
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!fName.trim() || !fVendor.trim() || !fRenewalDate) return;
     const status = computeStatus(fRenewalDate);
-    addSubscription({
-      name: fName.trim(),
-      vendor: fVendor.trim(),
-      type: fType,
-      cost: parseFloat(fCost) || 0,
-      billingCycle: fBillingCycle,
-      purchaseDate: fPurchaseDate || new Date().toISOString().split('T')[0],
-      renewalDate: fRenewalDate,
-      status,
-      assignmentScope: fScope,
-      ...(fScope !== 'Company-Wide' && fAssignedToIds.length ? { assignedToIds: fAssignedToIds } : {}),
-      ...(fScope === 'Team' && fTeamName ? { teamName: fTeamName } : {}),
-      ...(fLinkedAccountId ? { linkedAccountId: fLinkedAccountId } : {}),
-      ...(!fLinkedAccountId && (fCredEmail || fCredPassword)
-        ? { credentials: { email: fCredEmail || undefined, password: fCredPassword || undefined, lastUpdated: new Date().toISOString().split('T')[0] } }
-        : {}),
-      ...(fLicenseCount ? { licenseCount: parseInt(fLicenseCount) } : {}),
-      ...(fNotes.trim() ? { notes: fNotes.trim() } : {}),
-      alertDays: [30, 7, 1],
-    });
-    resetForm();
+    try {
+      await createSubscriptionMutation.mutateAsync({
+        name: fName.trim(),
+        vendor: fVendor.trim(),
+        type: fType,
+        cost: parseFloat(fCost) || 0,
+        billingCycle: fBillingCycle,
+        purchaseDate: fPurchaseDate || new Date().toISOString().split('T')[0],
+        renewalDate: fRenewalDate,
+        status,
+        assignmentScope: fScope,
+        ...(fScope !== 'Company-Wide' && fAssignedToIds.length ? { assignedToIds: fAssignedToIds } : {}),
+        ...(fScope === 'Team' && fTeamName ? { teamName: fTeamName } : {}),
+        ...(fLinkedAccountId ? { linkedAccountId: fLinkedAccountId } : {}),
+        ...(!fLinkedAccountId && (fCredEmail || fCredPassword)
+          ? {
+              credentials: {
+                email: fCredEmail || undefined,
+                password: fCredPassword || undefined,
+                lastUpdated: new Date().toISOString().split('T')[0],
+              },
+            }
+          : {}),
+        ...(fLicenseCount ? { licenseCount: parseInt(fLicenseCount) } : {}),
+        ...(fNotes.trim() ? { notes: fNotes.trim() } : {}),
+        alertDays: [30, 7, 1],
+      });
+      resetForm();
+    } catch {
+      // handled by inline error UI below
+    }
   };
 
   const filtered = subscriptions.filter(s => {
@@ -136,6 +164,12 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
           </Button>
         )}
       </div>
+
+      {subscriptionsQuery.isError && (
+        <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 text-sm text-rose-500">
+          Failed to load subscriptions: {toApiError(subscriptionsQuery.error)}
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -256,7 +290,13 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
                       <div className="opacity-0 group-hover:opacity-100 transition-all flex justify-end gap-2">
                         {can('subscriptions.edit') && (
                           <button
-                            onClick={e => { e.stopPropagation(); updateSubscription(sub.id, { status: computeStatus(sub.renewalDate) }); }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              void updateSubscriptionMutation.mutateAsync({
+                                id: sub.id,
+                                payload: { status: computeStatus(sub.renewalDate) },
+                              });
+                            }}
                             className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"
                             title="Refresh status"
                           >
@@ -515,7 +555,13 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
                 <div className="flex flex-wrap gap-2">
                   {(['Active', 'Expiring Soon', 'Expired', 'Cancelled'] as SubscriptionStatus[]).map(s => (
                     <button key={s}
-                      onClick={() => { updateSubscription(selectedSub.id, { status: s }); setSelectedSub({ ...selectedSub, status: s }); }}
+                      onClick={() => {
+                        void updateSubscriptionMutation.mutateAsync({
+                          id: selectedSub.id,
+                          payload: { status: s },
+                        });
+                        setSelectedSub({ ...selectedSub, status: s });
+                      }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${selectedSub.status === s ? 'bg-primary text-primary-foreground border-primary' : 'bg-accent/40 border-border hover:bg-accent'}`}
                     >{s}</button>
                   ))}
@@ -526,7 +572,14 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={resetForm}>Close</Button>
               {can('subscriptions.delete') && (
-                <Button variant="danger" className="flex-1" onClick={() => { deleteSubscription(selectedSub.id); resetForm(); }}>
+                <Button
+                  variant="danger"
+                  className="flex-1"
+                  onClick={() => {
+                    void deleteSubscriptionMutation.mutateAsync(selectedSub.id);
+                    resetForm();
+                  }}
+                >
                   <Trash2 className="w-4 h-4" /> Delete
                 </Button>
               )}

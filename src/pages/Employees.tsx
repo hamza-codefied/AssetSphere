@@ -3,13 +3,25 @@ import { Card, Badge, Button, Modal, CustomSelect } from '../components/ui';
 import {
   UserPlus, Briefcase, ChevronRight, Phone, Building, Mail,
   LogOut, Monitor, HardDrive, Wrench, Check, ChevronLeft, ChevronRight as ChevronRightIcon,
-  AlertTriangle, ClipboardList, ShieldOff, Package, FileText
+  AlertTriangle, ClipboardList, ShieldOff, Package, FileText, Loader2, Eye, EyeOff, Pencil, Trash2
 } from 'lucide-react';
 
-import type { Employee, HardwareAsset, SoftwareTool } from '../types';
+import type { Employee, HardwareAsset, SoftwareTool, EmployeeRole } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
 import { FolderOpen, CreditCard } from 'lucide-react';
+import {
+  useCreateEmployeeMutation,
+  useDeleteEmployeeMutation,
+  useEmployeesQuery,
+  useOffboardEmployeeMutation,
+  useUpdateEmployeeMutation,
+} from '../api/queries/employees';
+import { useHardwareQuery } from '../api/queries/hardware';
+import { useToolsQuery } from '../api/queries/tools';
+import type { AssignableEmployeeRole } from '../api/employees';
+import { toApiError } from '../api/client';
+import { roleConfig } from '../auth/permissions';
 
 // ---- Offboarding checklist definition ----
 interface ChecklistItem {
@@ -18,6 +30,13 @@ interface ChecklistItem {
   description: string;
   icon: ReactElement;
   required: boolean;
+}
+
+type ToastType = 'success' | 'error';
+interface ToastMessage {
+  id: string;
+  type: ToastType;
+  message: string;
 }
 
 const CHECKLIST_ITEMS: ChecklistItem[] = [
@@ -42,21 +61,41 @@ const STEP_LABELS: Record<OffboardStep, string> = {
 };
 
 export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
-  const { employees, hardware, tools, subscriptions, projects, addEmployee, updateEmployee, offboardEmployee } = state;
+  // Hardware + employees are API-backed. Tools/subscriptions/projects remain mock-backed
+  // until those modules are integrated.
+  const { subscriptions, projects } = state;
   const { can } = useAuth();
+
+  const employeesQuery = useEmployeesQuery();
+  const hardwareQuery = useHardwareQuery();
+  const toolsQuery = useToolsQuery();
+  const employees: Employee[] = employeesQuery.data ?? [];
+  const hardware: HardwareAsset[] = hardwareQuery.data ?? [];
+  const tools: SoftwareTool[] = toolsQuery.data ?? [];
+  const createEmployeeMutation = useCreateEmployeeMutation();
+  const updateEmployeeMutation = useUpdateEmployeeMutation();
+  const offboardEmployeeMutation = useOffboardEmployeeMutation();
+  const deleteEmployeeMutation = useDeleteEmployeeMutation();
 
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isOffboardingOpen, setIsOffboardingOpen] = useState(false);
   const [offboardTarget, setOffboardTarget] = useState<Employee | null>(null);
+
+  const DEFAULT_ROLE: AssignableEmployeeRole = 'dev';
+  const DEFAULT_DEPARTMENT = 'Engineering';
 
   // Onboard form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('Engineer');
-  const [department, setDepartment] = useState('Technology');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [accessRole, setAccessRole] = useState<AssignableEmployeeRole>(DEFAULT_ROLE);
+  const [department, setDepartment] = useState(DEFAULT_DEPARTMENT);
   const [phone, setPhone] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Offboard wizard state
   const [offboardStep, setOffboardStep] = useState<OffboardStep>(1);
@@ -64,11 +103,33 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
   const [revokedToolIds, setRevokedToolIds] = useState<Set<string>>(new Set());
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
   const [offboardNotes, setOffboardNotes] = useState('');
+  const [offboardError, setOffboardError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
 
   const resetForm = () => {
-    setName(''); setEmail(''); setRole('Engineer');
-    setDepartment('Technology'); setPhone('');
-    setIsAddMode(false); setIsModalOpen(false); setSelectedEmployee(null);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setShowPassword(false);
+    setAccessRole(DEFAULT_ROLE);
+    setDepartment(DEFAULT_DEPARTMENT);
+    setPhone('');
+    setFormError(null);
+    setIsAddMode(false);
+    setIsEditMode(false);
+    setIsModalOpen(false);
+    setSelectedEmployee(null);
+  };
+
+  const roleLabel = (r: EmployeeRole): string => roleConfig[r]?.label ?? r;
+  const roleBadgeClasses = (r: EmployeeRole): string => roleConfig[r]?.color ?? 'bg-slate-500/10 text-slate-500';
+  const pushToast = (type: ToastType, message: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3000);
   };
 
   const openOffboarding = (emp: Employee) => {
@@ -78,6 +139,7 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
     setRevokedToolIds(new Set());
     setChecklist({});
     setOffboardNotes('');
+    setOffboardError(null);
     setIsModalOpen(false);
     setIsOffboardingOpen(true);
   };
@@ -85,12 +147,98 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
   const closeOffboarding = () => {
     setIsOffboardingOpen(false);
     setOffboardTarget(null);
+    setOffboardError(null);
   };
 
-  const handleAdd = () => {
-    if (!name.trim() || !email.trim()) return;
-    addEmployee({ name, email, role, department, phone: phone || undefined, status: 'Active', assignedAssetCount: 0, assignedToolCount: 0 });
-    resetForm();
+  const handleAdd = async () => {
+    if (!name.trim() || !email.trim() || password.length < 6) {
+      setFormError('Name, email and a password (min 6 chars) are required.');
+      return;
+    }
+    setFormError(null);
+    try {
+      await createEmployeeMutation.mutateAsync({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        role: accessRole,
+        department: department || undefined,
+        phone: phone || undefined,
+      });
+      resetForm();
+      pushToast('success', 'Employee created successfully.');
+    } catch (error) {
+      setFormError(toApiError(error));
+      pushToast('error', toApiError(error));
+    }
+  };
+
+  const openEdit = (emp: Employee) => {
+    setSelectedEmployee(emp);
+    setName(emp.name);
+    setEmail(emp.email);
+    setPassword('');
+    setShowPassword(false);
+    setAccessRole(emp.role === 'pmo' ? 'pmo' : 'dev');
+    setDepartment(emp.department ?? DEFAULT_DEPARTMENT);
+    setPhone(emp.phone ?? '');
+    setFormError(null);
+    setIsAddMode(false);
+    setIsEditMode(true);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = async () => {
+    if (!selectedEmployee) return;
+    if (!name.trim() || !email.trim()) {
+      setFormError('Name and email are required.');
+      return;
+    }
+    if (password && password.length < 6) {
+      setFormError('If provided, password must be at least 6 characters.');
+      return;
+    }
+
+    setFormError(null);
+    try {
+      await updateEmployeeMutation.mutateAsync({
+        id: selectedEmployee.id,
+        payload: {
+          name: name.trim(),
+          email: email.trim(),
+          role: accessRole,
+          department: department || undefined,
+          phone: phone || undefined,
+          ...(password ? { password } : {}),
+        },
+      });
+      resetForm();
+      pushToast('success', 'Employee updated successfully.');
+    } catch (error) {
+      setFormError(toApiError(error));
+      pushToast('error', toApiError(error));
+    }
+  };
+
+  const openDeleteConfirm = (emp: Employee) => {
+    if (emp.role === 'admin') return;
+    setDeleteTarget(emp);
+  };
+
+  const closeDeleteConfirm = () => {
+    setDeleteTarget(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteEmployeeMutation.mutateAsync(deleteTarget.id);
+      if (selectedEmployee?.id === deleteTarget.id) resetForm();
+      pushToast('success', `Employee "${deleteTarget.name}" deleted.`);
+      closeDeleteConfirm();
+    } catch (error) {
+      pushToast('error', toApiError(error));
+    }
   };
 
   const getAssignedHardware = (empId: string): HardwareAsset[] => hardware.filter(h => h.assignedToId === empId);
@@ -113,10 +261,33 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
 
   const totalOffboardSteps = 5 as const;
 
-  const handleCompleteOffboard = () => {
+  const handleCompleteOffboard = async () => {
     if (!offboardTarget) return;
-    offboardEmployee(offboardTarget.id, offboardNotes.trim() || undefined);
-    closeOffboarding();
+    setOffboardError(null);
+    try {
+      await offboardEmployeeMutation.mutateAsync({
+        id: offboardTarget.id,
+        notes: offboardNotes.trim() || undefined,
+      });
+      closeOffboarding();
+      pushToast('success', 'Employee offboarded successfully.');
+    } catch (error) {
+      setOffboardError(toApiError(error));
+      pushToast('error', toApiError(error));
+    }
+  };
+
+  const handleReactivate = async (emp: Employee) => {
+    try {
+      await updateEmployeeMutation.mutateAsync({
+        id: emp.id,
+        payload: { status: 'Active', isActive: true },
+      });
+      resetForm();
+      pushToast('success', `Employee "${emp.name}" reactivated.`);
+    } catch (error) {
+      pushToast('error', toApiError(error));
+    }
   };
 
   const toggleHw = (id: string) =>
@@ -149,6 +320,23 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
 
   return (
     <div className="space-y-6">
+      {toasts.length > 0 && (
+        <div className="fixed top-4 right-4 z-70 flex flex-col gap-2 w-[320px]">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`rounded-xl border px-4 py-3 text-sm shadow-lg backdrop-blur-sm ${
+                toast.type === 'success'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                  : 'border-rose-500/30 bg-rose-500/10 text-rose-600'
+              }`}
+            >
+              {toast.message}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -156,12 +344,18 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
           <p className="text-muted-foreground">Directory of team members and their assigned resources.</p>
         </div>
         {can('employees.create') && (
-          <Button onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
+          <Button onClick={() => { setIsAddMode(true); setIsEditMode(false); setIsModalOpen(true); }}>
             <UserPlus className="w-4 h-4" />
             Onboard Employee
           </Button>
         )}
       </div>
+
+      {employeesQuery.isError && (
+        <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 text-sm text-rose-500">
+          Failed to load employees: {toApiError(employeesQuery.error)}
+        </div>
+      )}
 
       {/* Table */}
       <Card className="p-0 overflow-hidden shadow-premium">
@@ -174,15 +368,29 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-center">Hardware</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-center">Tools</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground"></th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
+              {employeesQuery.isLoading && employees.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
+                    <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading employees...</span>
+                  </td>
+                </tr>
+              )}
+              {!employeesQuery.isLoading && employees.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
+                    No employees yet. Click <span className="font-semibold">Onboard Employee</span> to add your first team member.
+                  </td>
+                </tr>
+              )}
               {employees.map((emp) => (
                 <tr
                   key={emp.id}
                   className="hover:bg-accent/30 transition-all group cursor-pointer"
-                  onClick={() => { setSelectedEmployee(emp); setIsAddMode(false); setIsModalOpen(true); }}
+                  onClick={() => { setSelectedEmployee(emp); setIsAddMode(false); setIsEditMode(false); setIsModalOpen(true); }}
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -204,7 +412,9 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
                       </div>
                       <div className="flex items-center gap-2">
                         <Briefcase className="w-3.5 h-3.5 text-primary/70" />
-                        <span className="text-sm font-medium">{emp.role}</span>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${roleBadgeClasses(emp.role)}`}>
+                          {roleLabel(emp.role)}
+                        </span>
                       </div>
                     </div>
                   </td>
@@ -221,11 +431,35 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
                       <Badge variant={emp.status === 'Active' ? 'success' : 'danger'}>{emp.status}</Badge>
-                      {emp.offboardedAt && <span className="text-[10px] text-muted-foreground">Off: {emp.offboardedAt}</span>}
+                      {emp.status === 'Inactive' && emp.offboardedAt && (
+                        <span className="text-[10px] text-muted-foreground">Off: {emp.offboardedAt}</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform inline" />
+                    <div className="flex justify-end gap-2">
+                      {can('employees.edit') && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEdit(emp); }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border bg-accent/40 hover:bg-accent transition-colors"
+                          title="Edit employee"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
+                        </button>
+                      )}
+                      {can('employees.deactivate') && emp.role !== 'admin' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openDeleteConfirm(emp); }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-rose-500/20 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
+                          title="Delete employee"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
+                        </button>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform inline self-center" />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -235,8 +469,8 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
       </Card>
 
       {/* ---- Profile Modal ---- */}
-      <Modal isOpen={isModalOpen} onClose={resetForm} title={isAddMode ? 'Onboard New Employee' : 'Employee Profile'}>
-        {isAddMode ? (
+      <Modal isOpen={isModalOpen} onClose={resetForm} title={isAddMode ? 'Onboard New Employee' : isEditMode ? 'Edit Employee' : 'Employee Profile'}>
+        {isAddMode || isEditMode ? (
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Full Name <span className="text-destructive">*</span></label>
@@ -244,31 +478,106 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Work Email <span className="text-destructive">*</span></label>
-              <input value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. alice@company.com" />
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="off"
+                className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="e.g. alice@company.com"
+              />
+              <p className="text-[11px] text-muted-foreground">This email will be the employee's login.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {isEditMode ? 'Reset Password (Optional)' : 'Initial Password'}
+                {!isEditMode && <span className="text-destructive"> *</span>}
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="w-full bg-accent p-2.5 pr-10 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder={isEditMode ? 'Leave empty to keep current password' : 'Minimum 6 characters'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute inset-y-0 right-2 flex items-center text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {isEditMode
+                  ? 'Fill only if admin wants to reset the employee password.'
+                  : 'Share this with the employee so they can log in and change it later.'}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Department</label>
-                <CustomSelect value={department} onChange={val => setDepartment(val)} options={[
-                  { value: 'Technology', label: 'Technology' },
-                  { value: 'Design', label: 'Design' },
-                  { value: 'Management', label: 'Management' },
-                  { value: 'Human Resources', label: 'HR' },
-                  { value: 'Operations', label: 'Operations' }
-                ]} />
+                <label className="text-sm font-medium">Access Role <span className="text-destructive">*</span></label>
+                <CustomSelect
+                  value={accessRole}
+                  onChange={val => setAccessRole(val as AssignableEmployeeRole)}
+                  options={[
+                    { value: 'pmo', label: 'Project Manager (PMO)' },
+                    { value: 'dev', label: 'Developer (Dev)' },
+                  ]}
+                />
+                <p className="text-[11px] text-muted-foreground">Controls what the employee can see and do.</p>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Role</label>
-                <input value={role} onChange={e => setRole(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. Lead Engineer" />
+                <label className="text-sm font-medium">Department</label>
+                <CustomSelect value={department} onChange={val => setDepartment(val)} options={[
+                  { value: 'Engineering', label: 'Engineering' },
+                  { value: 'Project Management', label: 'Project Management' },
+                  { value: 'Design', label: 'Design' },
+                  { value: 'DevOps', label: 'DevOps' },
+                  { value: 'Operations', label: 'Operations' },
+                  { value: 'People Ops', label: 'People Ops' },
+                ]} />
               </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Phone Number (Optional)</label>
               <input value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. +1 (555) 000-0000" />
             </div>
+            {formError && (
+              <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 text-xs text-rose-500">
+                {formError}
+              </div>
+            )}
             <div className="flex gap-3 pt-4">
-              <Button variant="outline" className="flex-1" onClick={resetForm}>Cancel</Button>
-              <Button className="flex-1" onClick={handleAdd} disabled={!name.trim() || !email.trim()}>Complete Onboarding</Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={resetForm}
+                disabled={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={isEditMode ? handleEdit : handleAdd}
+                disabled={
+                  createEmployeeMutation.isPending ||
+                  updateEmployeeMutation.isPending ||
+                  !name.trim() ||
+                  !email.trim() ||
+                  (!isEditMode && password.length < 6) ||
+                  (isEditMode && password.length > 0 && password.length < 6)
+                }
+              >
+                {createEmployeeMutation.isPending || updateEmployeeMutation.isPending ? (
+                  <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {isEditMode ? 'Saving...' : 'Creating...'}</span>
+                ) : (
+                  isEditMode ? 'Save Changes' : 'Complete Onboarding'
+                )}
+              </Button>
             </div>
           </div>
         ) : selectedEmployee ? (
@@ -281,10 +590,12 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
               <div className="flex-1">
                 <h2 className="text-2xl font-bold leading-tight">{selectedEmployee.name}</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="info">{selectedEmployee.department || 'Technology'}</Badge>
-                  <p className="text-muted-foreground text-sm font-medium">{selectedEmployee.role}</p>
+                  <Badge variant="info">{selectedEmployee.department || 'General'}</Badge>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${roleBadgeClasses(selectedEmployee.role)}`}>
+                    {roleLabel(selectedEmployee.role)}
+                  </span>
                 </div>
-                {selectedEmployee.offboardedAt && (
+                {selectedEmployee.status === 'Inactive' && selectedEmployee.offboardedAt && (
                   <p className="text-xs text-rose-500 font-medium mt-1">Offboarded on {selectedEmployee.offboardedAt}</p>
                 )}
               </div>
@@ -355,7 +666,7 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
               </div>
             </div>
 
-            {selectedEmployee.offboardNotes && (
+            {selectedEmployee.status === 'Inactive' && selectedEmployee.offboardNotes && (
               <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20">
                 <p className="text-xs font-bold text-rose-600 uppercase tracking-widest mb-1">Offboarding Notes</p>
                 <p className="text-sm text-rose-300">{selectedEmployee.offboardNotes}</p>
@@ -364,13 +675,17 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
 
             <div className="flex gap-3 pt-4 border-t">
               <Button variant="outline" className="flex-1" onClick={resetForm}>Close</Button>
-              {can('employees.deactivate') && selectedEmployee.status === 'Inactive' && !selectedEmployee.offboardedAt && (
-                <Button variant="success" className="flex-1"
-                  onClick={() => { updateEmployee(selectedEmployee.id, { status: 'Active' }); resetForm(); }}>
-                  Reactivate
+              {can('employees.deactivate') && selectedEmployee.status === 'Inactive' && selectedEmployee.role !== 'admin' && (
+                <Button
+                  variant="success"
+                  className="flex-1"
+                  disabled={updateEmployeeMutation.isPending}
+                  onClick={() => handleReactivate(selectedEmployee)}
+                >
+                  {updateEmployeeMutation.isPending ? 'Reactivating...' : 'Reactivate'}
                 </Button>
               )}
-              {can('employees.offboard') && selectedEmployee.status === 'Active' && (
+              {can('employees.offboard') && selectedEmployee.status === 'Active' && selectedEmployee.role !== 'admin' && (
                 <Button
                   variant="danger"
                   className="flex-1"
@@ -397,7 +712,7 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-rose-600">Offboarding: {offboardTarget.name}</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  {offboardTarget.role} · {offboardTarget.department || 'General'} · {offboardTarget.email}
+                  {roleLabel(offboardTarget.role)} · {offboardTarget.department || 'General'} · {offboardTarget.email}
                 </p>
               </div>
             </div>
@@ -656,12 +971,18 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
               )}
             </div>
 
+            {offboardError && (
+              <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 text-xs text-rose-500">
+                {offboardError}
+              </div>
+            )}
+
             {/* Footer navigation */}
             <div className="flex gap-3 pt-2 border-t">
-              <Button variant="outline" onClick={closeOffboarding} className="flex-none">Cancel</Button>
+              <Button variant="outline" onClick={closeOffboarding} className="flex-none" disabled={offboardEmployeeMutation.isPending}>Cancel</Button>
               <div className="flex-1" />
               {offboardStep > 1 && (
-                <Button variant="outline" onClick={() => setOffboardStep((offboardStep - 1) as OffboardStep)}>
+                <Button variant="outline" onClick={() => setOffboardStep((offboardStep - 1) as OffboardStep)} disabled={offboardEmployeeMutation.isPending}>
                   <ChevronLeft className="w-4 h-4" /> Back
                 </Button>
               )}
@@ -672,16 +993,65 @@ export const Employees = ({ state }: { state: ReturnType<typeof useSystemState> 
               ) : (
                 <Button
                   variant="danger"
-                  disabled={!canCompleteOffboard()}
+                  disabled={!canCompleteOffboard() || offboardEmployeeMutation.isPending}
                   onClick={handleCompleteOffboard}
                 >
-                  <LogOut className="w-4 h-4" /> Confirm Offboarding
+                  {offboardEmployeeMutation.isPending ? (
+                    <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Offboarding...</span>
+                  ) : (
+                    <><LogOut className="w-4 h-4" /> Confirm Offboarding</>
+                  )}
                 </Button>
               )}
             </div>
           </div>
         </Modal>
       )}
+
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={closeDeleteConfirm}
+        title="Delete Employee"
+      >
+        {deleteTarget && (
+          <div className="space-y-5">
+            <div className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5 text-sm text-rose-600">
+              This action permanently deletes <strong>{deleteTarget.name}</strong>.
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This cannot be undone. Are you sure you want to continue?
+            </p>
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={closeDeleteConfirm}
+                disabled={deleteEmployeeMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1"
+                onClick={handleDeleteConfirm}
+                disabled={deleteEmployeeMutation.isPending}
+              >
+                {deleteEmployeeMutation.isPending ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </span>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete Employee
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

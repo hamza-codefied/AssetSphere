@@ -5,11 +5,19 @@ import {
 } from '../components/ui';
 import {
   ShieldCheck, Mail, Cloud, Globe, ExternalLink, ShieldAlert, Key, Trash2,
-  Smartphone, KeyRound, Copy, Check, RefreshCw, ShieldOff
+  Smartphone, KeyRound, Copy, Check, RefreshCw, ShieldOff, Pencil
 } from 'lucide-react';
 import type { Account, Credentials } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
+import {
+  useAccountsQuery,
+  useCreateAccountMutation,
+  useDeleteAccountMutation,
+  useRegenerateBackupCodesMutation,
+  useUpdateAccountMutation,
+} from '../api/queries/accounts';
+import { toApiError } from '../api/client';
 
 type TwoFactorMethod = 'Authenticator' | 'SMS' | 'Email';
 
@@ -45,11 +53,20 @@ const methodIcon: Record<TwoFactorMethod, ReactElement> = {
 };
 
 export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
-  const { accounts, tools, addAccount, updateAccount, deleteAccount } = state;
+  const { tools } = state;
   const { can } = useAuth();
+  const accountsQuery = useAccountsQuery();
+  const accounts = accountsQuery.data ?? [];
+  const createAccountMutation = useCreateAccountMutation();
+  const updateAccountMutation = useUpdateAccountMutation();
+  const regenerateCodesMutation = useRegenerateBackupCodesMutation();
+  const deleteAccountMutation = useDeleteAccountMutation();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Form State
   const [email, setEmail] = useState('');
@@ -68,6 +85,14 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
   // Detail-view state for backup-code reveal / copy feedback
   const [backupCodesVisible, setBackupCodesVisible] = useState(false);
   const [copiedCodes, setCopiedCodes] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [editAccountId, setEditAccountId] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editType, setEditType] = useState<Account['type']>('Gmail');
+  const [editStatus, setEditStatus] = useState<Account['status']>('Active');
+  const [editPassword, setEditPassword] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
 
   const resetForm = () => {
     setEmail('');
@@ -84,9 +109,21 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
     setAccountExtraFields([]);
     setBackupCodesVisible(false);
     setCopiedCodes(false);
+    setFormError(null);
     setIsAddMode(false);
     setIsModalOpen(false);
     setSelectedAccount(null);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditAccountId('');
+    setEditName('');
+    setEditEmail('');
+    setEditType('Gmail');
+    setEditStatus('Active');
+    setEditPassword('');
+    setEditError(null);
   };
 
   const buildTwoFactor = (): Credentials['twoFactor'] | undefined => {
@@ -109,7 +146,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
     return { ...base, recoveryEmail: twoFactorRecoveryEmail.trim() || undefined };
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) return;
     if (enable2FA) {
       if (twoFactorMethod === 'SMS' && !twoFactorPhone.trim()) return;
@@ -118,53 +155,128 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
     }
     const twoFactor = buildTwoFactor();
     const extraStored = customFieldRowsToStored(accountExtraFields);
-    addAccount({
-      name,
-      email,
-      type: type as any,
-      status: 'Active',
-      isCompanyOwned: true,
-      credentials: {
+    setFormError(null);
+    try {
+      await createAccountMutation.mutateAsync({
+        name,
         email,
-        password,
-        ...(extraStored.length ? { customFields: extraStored } : {}),
-        ...(twoFactor ? { twoFactor } : {}),
-        lastUpdated: new Date().toISOString().split('T')[0]
-      }
-    });
-    resetForm();
+        type: type as any,
+        status: 'Active',
+        isCompanyOwned: true,
+        credentials: {
+          email,
+          password,
+          ...(extraStored.length ? { customFields: extraStored } : {}),
+          ...(twoFactor ? { twoFactor } : {}),
+          lastUpdated: new Date().toISOString().split('T')[0],
+        },
+      });
+      setFeedback({ type: 'success', message: 'Account created successfully.' });
+      resetForm();
+    } catch (error) {
+      const message = toApiError(error);
+      setFormError(message);
+      setFeedback({ type: 'error', message });
+    }
   };
 
   const canReveal = can('vault.reveal_passwords');
 
-  const handleRegenerateBackupCodes = (account: Account) => {
+  const handleRegenerateBackupCodes = async (account: Account) => {
     if (!account.credentials.twoFactor) return;
-    const codes = generateBackupCodes();
-    updateAccount(account.id, {
-      credentials: {
-        ...account.credentials,
-        twoFactor: { ...account.credentials.twoFactor, backupCodes: codes },
-        lastUpdated: new Date().toISOString().split('T')[0]
-      }
-    });
-    setSelectedAccount({
-      ...account,
-      credentials: {
-        ...account.credentials,
-        twoFactor: { ...account.credentials.twoFactor, backupCodes: codes }
-      }
-    });
-    setBackupCodesVisible(true);
+    try {
+      const updated = await regenerateCodesMutation.mutateAsync(account.id);
+      setSelectedAccount(updated);
+      setBackupCodesVisible(true);
+      setFeedback({ type: 'success', message: 'Backup codes regenerated.' });
+    } catch (error) {
+      setFeedback({ type: 'error', message: toApiError(error) });
+    }
   };
 
-  const handleDisable2FA = (account: Account) => {
+  const handleDisable2FA = async (account: Account) => {
     const { twoFactor, ...rest } = account.credentials;
     void twoFactor;
-    updateAccount(account.id, {
-      credentials: { ...rest, lastUpdated: new Date().toISOString().split('T')[0] }
-    });
-    setSelectedAccount({ ...account, credentials: { ...rest } });
-    setBackupCodesVisible(false);
+    try {
+      const updated = await updateAccountMutation.mutateAsync({
+        id: account.id,
+        payload: {
+          credentials: {
+            ...rest,
+            lastUpdated: new Date().toISOString().split('T')[0],
+          },
+        },
+      });
+      setSelectedAccount(updated);
+      setBackupCodesVisible(false);
+      setFeedback({ type: 'success', message: '2FA disabled for this account.' });
+    } catch (error) {
+      setFeedback({ type: 'error', message: toApiError(error) });
+    }
+  };
+
+  const requestDelete = (account: Account) => setDeleteTarget(account);
+  const closeDeleteModal = () => setDeleteTarget(null);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteAccountMutation.mutateAsync(deleteTarget.id);
+      setFeedback({ type: 'success', message: `Account "${deleteTarget.name}" deleted.` });
+      if (selectedAccount?.id === deleteTarget.id) resetForm();
+      closeDeleteModal();
+    } catch (error) {
+      setFeedback({ type: 'error', message: toApiError(error) });
+    }
+  };
+
+  const openEditModal = (account: Account) => {
+    setEditAccountId(account.id);
+    setEditName(account.name);
+    setEditEmail(account.email);
+    setEditType(account.type);
+    setEditStatus(account.status);
+    setEditPassword('');
+    setEditError(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateAccount = async () => {
+    if (!editAccountId) return;
+    if (!editName.trim() || !editEmail.trim()) {
+      setEditError('Name and email are required.');
+      return;
+    }
+    if (editPassword && editPassword.length < 6) {
+      setEditError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setEditError(null);
+    try {
+      const updated = await updateAccountMutation.mutateAsync({
+        id: editAccountId,
+        payload: {
+          name: editName.trim(),
+          email: editEmail.trim(),
+          type: editType,
+          status: editStatus,
+          ...(editPassword
+            ? {
+                credentials: {
+                  password: editPassword,
+                  lastUpdated: new Date().toISOString().split('T')[0],
+                },
+              }
+            : {}),
+        },
+      });
+      setSelectedAccount(updated);
+      setFeedback({ type: 'success', message: 'Account updated successfully.' });
+      closeEditModal();
+    } catch (error) {
+      setEditError(toApiError(error));
+      setFeedback({ type: 'error', message: toApiError(error) });
+    }
   };
 
   const copyBackupCodes = (codes: string[]) => {
@@ -188,6 +300,18 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
 
   return (
     <div className="space-y-6">
+      {feedback && (
+        <div
+          className={`p-3 rounded-xl border text-sm ${
+            feedback.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+              : 'bg-rose-500/10 border-rose-500/20 text-rose-600'
+          }`}
+        >
+          {feedback.message}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Central Accounts</h1>
@@ -202,6 +326,16 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {accountsQuery.isLoading && accounts.length === 0 && (
+          <Card className="md:col-span-2 lg:col-span-3">
+            <p className="text-sm text-muted-foreground">Loading accounts...</p>
+          </Card>
+        )}
+        {accountsQuery.isError && (
+          <Card className="md:col-span-2 lg:col-span-3 border-rose-500/20">
+            <p className="text-sm text-rose-600">Failed to load accounts: {toApiError(accountsQuery.error)}</p>
+          </Card>
+        )}
         {accounts.map((account) => (
           <Card 
             key={account.id} 
@@ -243,7 +377,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
         title={isAddMode ? 'New Central Account' : 'Account Intelligence'}
       >
         {isAddMode ? (
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1 custom-scrollbar">
              <div className="space-y-2">
                 <label className="text-sm font-medium">Identifier Name <span className="text-destructive">*</span></label>
                 <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. Master Admin" />
@@ -379,23 +513,29 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                 )}
              </div>
              <div className="flex gap-3 pt-4">
-               <Button variant="outline" className="flex-1" onClick={resetForm}>Cancel</Button>
+               <Button variant="outline" className="flex-1" onClick={resetForm} disabled={createAccountMutation.isPending}>Cancel</Button>
                <Button 
                  className="flex-1 bg-violet-600 hover:bg-violet-700" 
                  onClick={handleAdd}
                  disabled={
+                   createAccountMutation.isPending ||
                    !name.trim() || !email.trim() || !password.trim() ||
                    (enable2FA && twoFactorMethod === 'SMS' && !twoFactorPhone.trim()) ||
                    (enable2FA && twoFactorMethod === 'Email' && !twoFactorRecoveryEmail.trim()) ||
                    (enable2FA && twoFactorMethod === 'Authenticator' && !twoFactorSecret.trim())
                  }
                >
-                 Save Account
+                 {createAccountMutation.isPending ? 'Saving...' : 'Save Account'}
                </Button>
              </div>
+             {formError && (
+               <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/10 text-xs text-rose-600">
+                 {formError}
+               </div>
+             )}
           </div>
         ) : selectedAccount ? (
-          <div className="space-y-6">
+          <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-1 custom-scrollbar">
             <div className="p-4 bg-violet-500/5 rounded-2xl border border-violet-500/10 flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-violet-500 text-white flex items-center justify-center shadow-lg shadow-violet-500/20">
                 {getTypeIcon(selectedAccount.type)}
@@ -536,15 +676,17 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                         variant="outline"
                         className="flex-1"
                         onClick={() => handleRegenerateBackupCodes(selectedAccount)}
+                        disabled={regenerateCodesMutation.isPending}
                       >
-                        <RefreshCw className="w-4 h-4" /> Rotate Backup Codes
+                        <RefreshCw className="w-4 h-4" /> {regenerateCodesMutation.isPending ? 'Rotating...' : 'Rotate Backup Codes'}
                       </Button>
                       <Button
                         variant="outline"
                         className="flex-1 text-destructive hover:bg-destructive/10"
                         onClick={() => handleDisable2FA(selectedAccount)}
+                        disabled={updateAccountMutation.isPending}
                       >
-                        <ShieldOff className="w-4 h-4" /> Disable 2FA
+                        <ShieldOff className="w-4 h-4" /> {updateAccountMutation.isPending ? 'Updating...' : 'Disable 2FA'}
                       </Button>
                     </div>
                   )}
@@ -582,8 +724,13 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
             </div>
 
             <div className="pt-4 flex gap-3">
+              {can('accounts.edit') && (
+                <Button variant="outline" className="flex-1" onClick={() => openEditModal(selectedAccount)}>
+                  <Pencil className="w-4 h-4" /> Edit Account
+                </Button>
+              )}
               {can('accounts.delete') && (
-                <Button variant="danger" className="flex-1" onClick={() => { deleteAccount(selectedAccount.id); resetForm(); }}>
+                <Button variant="danger" className="flex-1" onClick={() => requestDelete(selectedAccount)}>
                   <Trash2 className="w-4 h-4" /> Delete Account
                 </Button>
               )}
@@ -591,6 +738,98 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
             </div>
           </div>
         ) : null}
+      </Modal>
+
+      <Modal isOpen={Boolean(deleteTarget)} onClose={closeDeleteModal} title="Delete Account">
+        {deleteTarget && (
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/10 text-sm text-rose-600">
+              This will permanently delete <strong>{deleteTarget.name}</strong> and unlink it from tools.
+            </div>
+            <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={closeDeleteModal} disabled={deleteAccountMutation.isPending}>
+                Cancel
+              </Button>
+              <Button variant="danger" className="flex-1" onClick={confirmDelete} disabled={deleteAccountMutation.isPending}>
+                {deleteAccountMutation.isPending ? 'Deleting...' : 'Delete Account'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={isEditModalOpen} onClose={closeEditModal} title="Edit Account">
+        <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1 custom-scrollbar">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Identifier Name <span className="text-destructive">*</span></label>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Email / Username <span className="text-destructive">*</span></label>
+            <input
+              value={editEmail}
+              onChange={(e) => setEditEmail(e.target.value)}
+              className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Account Provider</label>
+              <CustomSelect
+                value={editType}
+                onChange={(val) => setEditType(val as Account['type'])}
+                options={[
+                  { value: 'Gmail', label: 'Gmail' },
+                  { value: 'AWS', label: 'AWS' },
+                  { value: 'Domain', label: 'Domain' },
+                  { value: 'Slack', label: 'Slack' },
+                  { value: 'GitHub', label: 'GitHub' },
+                  { value: 'Figma', label: 'Figma' },
+                  { value: 'Notion', label: 'Notion' },
+                  { value: 'Other', label: 'Other' },
+                ]}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Status</label>
+              <CustomSelect
+                value={editStatus}
+                onChange={(val) => setEditStatus(val as Account['status'])}
+                options={[
+                  { value: 'Active', label: 'Active' },
+                  { value: 'Disabled', label: 'Disabled' },
+                ]}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Reset Password (Optional)</label>
+            <PasswordInput
+              value={editPassword}
+              onChange={(e) => setEditPassword(e.target.value)}
+              placeholder="Leave empty to keep current password"
+            />
+            <p className="text-xs text-muted-foreground">Only set this when admin wants to rotate account password.</p>
+          </div>
+          {editError && (
+            <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/10 text-xs text-rose-600">
+              {editError}
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={closeEditModal} disabled={updateAccountMutation.isPending}>
+              Cancel
+            </Button>
+            <Button className="flex-1 bg-violet-600 hover:bg-violet-700" onClick={handleUpdateAccount} disabled={updateAccountMutation.isPending}>
+              {updateAccountMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

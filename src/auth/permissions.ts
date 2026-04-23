@@ -63,7 +63,7 @@ export const mockUsers: { email: string; password: string; user: AuthUser }[] = 
   {
     email: 'admin@assetsphere.com',
     password: 'admin123',
-    user: { id: 'user-admin', name: 'John Doe', email: 'admin@assetsphere.com', role: 'admin' },
+    user: { id: 'user-admin', name: 'Rohail', email: 'admin@assetsphere.com', role: 'admin' },
   },
   {
     email: 'pmo@assetsphere.com',

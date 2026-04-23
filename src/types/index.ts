@@ -65,11 +65,14 @@ export interface SoftwareTool {
   credentials?: Partial<Credentials>; // Can be partial if linked
 }
 
+/** System access role. Admin is seeded; PMO/Dev are created by admin. */
+export type EmployeeRole = 'admin' | 'pmo' | 'dev';
+
 export interface Employee {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: EmployeeRole;
   avatar?: string;
   status: EmployeeStatus;
   department?: string;

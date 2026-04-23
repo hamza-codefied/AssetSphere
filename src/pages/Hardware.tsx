@@ -1,63 +1,195 @@
 import { useState } from 'react';
 import { Card, Badge, Button, Modal, CredentialField, CustomSelect, PasswordInput } from '../components/ui';
-import { Plus, Monitor, HardDrive, MoreVertical, ShieldOff, Trash2 } from 'lucide-react';
+import { Plus, Monitor, HardDrive, ShieldOff, Trash2, Loader2 } from 'lucide-react';
 import type { HardwareAsset } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
+import { toApiError } from '../api/client';
+import {
+  useCreateHardwareMutation,
+  useDeleteHardwareMutation,
+  useHardwareQuery,
+  useUpdateHardwareMutation,
+} from '../api/queries/hardware';
+import { useEmployeesQuery } from '../api/queries/employees';
 
-export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
-  const { hardware, employees, addHardware, updateHardware, deleteHardware } = state;
+type ToastType = 'success' | 'error';
+interface ToastMessage {
+  id: string;
+  type: ToastType;
+  message: string;
+}
+
+export const Hardware = ({ state: _state }: { state: ReturnType<typeof useSystemState> }) => {
   const { can } = useAuth();
+  const hardwareQuery = useHardwareQuery();
+  const employeesQuery = useEmployeesQuery();
+
+  const hardware = hardwareQuery.data ?? [];
+  const employees = employeesQuery.data ?? [];
+
+  const createHardwareMutation = useCreateHardwareMutation();
+  const updateHardwareMutation = useUpdateHardwareMutation();
+  const deleteHardwareMutation = useDeleteHardwareMutation();
+
   const [selectedAsset, setSelectedAsset] = useState<HardwareAsset | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<HardwareAsset | null>(null);
 
-  // Form State
-  const [newName, setNewName] = useState('');
-  const [newSerial, setNewSerial] = useState('');
-  const [newType, setNewType] = useState('Laptop');
-  const [newPassword, setNewPassword] = useState('');
-  const [newNotes, setNewNotes] = useState('');
-  const [newAssigneeId, setNewAssigneeId] = useState('');
+  const [name, setName] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [type, setType] = useState('Laptop');
+  const [password, setPassword] = useState('');
+  const [notes, setNotes] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const pushToast = (type: ToastType, message: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+    }, 3000);
+  };
 
   const resetForm = () => {
-    setNewName('');
-    setNewSerial('');
-    setNewType('Laptop');
-    setNewPassword('');
-    setNewNotes('');
-    setNewAssigneeId('');
+    setName('');
+    setSerialNumber('');
+    setType('Laptop');
+    setPassword('');
+    setNotes('');
+    setAssigneeId('');
+    setFormError(null);
     setIsAddMode(false);
+    setIsEditMode(false);
     setIsModalOpen(false);
     setSelectedAsset(null);
   };
 
-  const handleAdd = () => {
-    if (!newName.trim()) return;
-    addHardware({
-      name: newName,
-      serialNumber: newSerial || 'SN-' + Math.floor(Math.random() * 10000),
-      type: newType,
-      status: newAssigneeId ? 'Assigned' : 'Available',
-      ...(newAssigneeId ? { assignedToId: newAssigneeId } : {}),
-      ...(newPassword ? { credentials: { password: newPassword, lastUpdated: new Date().toISOString().split('T')[0] } } : {}),
-      notes: newNotes
-    });
+  const openCreate = () => {
     resetForm();
+    setIsAddMode(true);
+    setIsModalOpen(true);
+  };
+
+  const openDetails = (asset: HardwareAsset) => {
+    setSelectedAsset(asset);
+    setIsAddMode(false);
+    setIsEditMode(false);
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (asset: HardwareAsset) => {
+    setSelectedAsset(asset);
+    setName(asset.name);
+    setSerialNumber(asset.serialNumber);
+    setType(asset.type);
+    setPassword('');
+    setNotes(asset.notes ?? '');
+    setAssigneeId(asset.assignedToId ?? '');
+    setFormError(null);
+    setIsAddMode(false);
+    setIsEditMode(true);
+    setIsModalOpen(true);
+  };
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      setFormError('Asset name is required.');
+      return;
+    }
+
+    setFormError(null);
+    try {
+      await createHardwareMutation.mutateAsync({
+        name: name.trim(),
+        serialNumber: serialNumber.trim() || undefined,
+        type,
+        assignedToId: assigneeId || undefined,
+        credentials: password
+          ? {
+              password,
+            }
+          : undefined,
+        notes: notes.trim() || undefined,
+      });
+      resetForm();
+      pushToast('success', 'Hardware asset created successfully.');
+    } catch (error) {
+      const msg = toApiError(error);
+      setFormError(msg);
+      pushToast('error', msg);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!selectedAsset) return;
+    if (!name.trim()) {
+      setFormError('Asset name is required.');
+      return;
+    }
+
+    setFormError(null);
+    try {
+      await updateHardwareMutation.mutateAsync({
+        id: selectedAsset.id,
+        payload: {
+          name: name.trim(),
+          serialNumber: serialNumber.trim() || undefined,
+          type,
+          assignedToId: assigneeId || undefined,
+          credentials: password
+            ? {
+                password,
+              }
+            : undefined,
+          notes: notes.trim() || undefined,
+        },
+      });
+      resetForm();
+      pushToast('success', 'Hardware asset updated successfully.');
+    } catch (error) {
+      const msg = toApiError(error);
+      setFormError(msg);
+      pushToast('error', msg);
+    }
+  };
+
+  const confirmDelete = (asset: HardwareAsset) => {
+    setDeleteTarget(asset);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteHardwareMutation.mutateAsync(deleteTarget.id);
+      if (selectedAsset?.id === deleteTarget.id) resetForm();
+      pushToast('success', `Asset "${deleteTarget.name}" deleted.`);
+      setDeleteTarget(null);
+    } catch (error) {
+      pushToast('error', toApiError(error));
+    }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Available': return <Badge variant="success">Available</Badge>;
-      case 'Assigned': return <Badge variant="info">Assigned</Badge>;
-      case 'Inactive': return <Badge variant="danger">Inactive</Badge>;
-      default: return <Badge>{status}</Badge>;
+      case 'Available':
+        return <Badge variant="success">Available</Badge>;
+      case 'Assigned':
+        return <Badge variant="info">Assigned</Badge>;
+      case 'Inactive':
+        return <Badge variant="danger">Inactive</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
     }
   };
 
   const getOwnerName = (id?: string) => {
     if (!id) return 'Unassigned';
-    return employees.find(e => e.id === id)?.name || 'Unknown';
+    return employees.find((employee) => employee.id === id)?.name || 'Unknown';
   };
 
   return (
@@ -68,7 +200,7 @@ export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }
           <p className="text-muted-foreground">Manage physical company assets and devices.</p>
         </div>
         {can('hardware.create') && (
-          <Button onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
+          <Button onClick={openCreate}>
             <Plus className="w-4 h-4" />
             Add New Asset
           </Button>
@@ -89,111 +221,163 @@ export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }
               </tr>
             </thead>
             <tbody className="divide-y">
-              {hardware.map((asset) => (
-                <tr 
-                  key={asset.id} 
-                  className="hover:bg-accent/30 transition-colors group cursor-pointer"
-                  onClick={() => {
-                    setSelectedAsset(asset);
-                    setIsAddMode(false);
-                    setIsModalOpen(true);
-                  }}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                        {asset.type === 'Laptop' ? <Monitor className="w-4 h-4" /> : <HardDrive className="w-4 h-4" />}
-                      </div>
-                      <span className="font-semibold">{asset.name}</span>
+              {hardwareQuery.isLoading && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Loading hardware...
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm">{asset.type}</td>
-                  <td className="px-6 py-4 text-sm font-mono">{asset.serialNumber}</td>
-                  <td className="px-6 py-4">{getStatusBadge(asset.status)}</td>
-                  <td className="px-6 py-4 text-sm font-medium">{getOwnerName(asset.assignedToId)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-accent rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                      <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                    </button>
+                </tr>
+              )}
+
+              {hardwareQuery.isError && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-destructive">
+                    Failed to load hardware: {toApiError(hardwareQuery.error)}
                   </td>
                 </tr>
-              ))}
+              )}
+
+              {!hardwareQuery.isLoading && !hardwareQuery.isError && hardware.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">
+                    No hardware assets found.
+                  </td>
+                </tr>
+              )}
+
+              {!hardwareQuery.isLoading &&
+                !hardwareQuery.isError &&
+                hardware.map((asset) => (
+                  <tr
+                    key={asset.id}
+                    className="hover:bg-accent/30 transition-colors group"
+                    onClick={() => openDetails(asset)}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                          {asset.type === 'Laptop' ? (
+                            <Monitor className="w-4 h-4" />
+                          ) : (
+                            <HardDrive className="w-4 h-4" />
+                          )}
+                        </div>
+                        <span className="font-semibold">{asset.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm">{asset.type}</td>
+                    <td className="px-6 py-4 text-sm font-mono">{asset.serialNumber}</td>
+                    <td className="px-6 py-4">{getStatusBadge(asset.status)}</td>
+                    <td className="px-6 py-4 text-sm font-medium">{getOwnerName(asset.assignedToId)}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                        {can('hardware.edit') && (
+                          <Button variant="outline" onClick={() => openEdit(asset)} className="px-3! py-2!">
+                            Edit
+                          </Button>
+                        )}
+                        {can('hardware.delete') && (
+                          <Button variant="danger" onClick={() => confirmDelete(asset)} className="px-3! py-2!">
+                            Delete
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       </Card>
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={resetForm} 
-        title={isAddMode ? 'Add New Asset' : (selectedAsset ? 'Asset Details' : '')}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={resetForm}
+        title={isAddMode ? 'Add New Asset' : isEditMode ? 'Edit Asset' : selectedAsset ? 'Asset Details' : ''}
       >
-        {isAddMode ? (
+        {isAddMode || isEditMode ? (
           <div className="space-y-4">
-             <div className="space-y-2">
-                <label className="text-sm font-medium">Asset Name <span className="text-destructive">*</span></label>
-                <input 
-                  value={newName} 
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" 
-                  placeholder="e.g. MacBook Pro 14" 
-                />
-             </div>
-             <div className="space-y-2">
-                <label className="text-sm font-medium">Serial Number</label>
-                <input 
-                  value={newSerial} 
-                  onChange={(e) => setNewSerial(e.target.value)}
-                  className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20" 
-                  placeholder="Auto-generated if empty" 
-                />
-             </div>
-             <div className="space-y-2">
-                <label className="text-sm font-medium">Type</label>
-                <CustomSelect 
-                  value={newType}
-                  onChange={(val) => setNewType(val)}
-                  options={[
-                    { value: 'Laptop', label: 'Laptop' },
-                    { value: 'Monitor', label: 'Monitor' },
-                    { value: 'Mobile', label: 'Mobile' },
-                    { value: 'Accessory', label: 'Accessory' }
-                  ]}
-                />
-             </div>
-             <div className="space-y-2">
-               <label className="text-sm font-medium">Assign to employee</label>
-               <CustomSelect
-                 value={newAssigneeId}
-                 onChange={(val) => setNewAssigneeId(val)}
-                 placeholder="Select assignee or leave unassigned..."
-                 options={[
-                   { value: '', label: 'Unassigned (Available)' },
-                   ...employees.map((e) => ({ value: e.id, label: e.name }))
-                 ]}
-               />
-             </div>
-             <div className="space-y-2">
-                <label className="text-sm font-medium">Device Password / PIN</label>
-                <PasswordInput 
-                  value={newPassword} 
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Optional — device login credential" 
-                />
-             </div>
-             <div className="space-y-2">
-                <label className="text-sm font-medium">Notes</label>
-                <textarea 
-                  value={newNotes} 
-                  onChange={(e) => setNewNotes(e.target.value)}
-                  className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 resize-none h-20" 
-                  placeholder="Optional — storage location, condition, etc." 
-                />
-             </div>
-             <div className="flex gap-3 pt-4">
-               <Button variant="outline" className="flex-1" onClick={resetForm}>Cancel</Button>
-               <Button className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>Create Asset</Button>
-             </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Asset Name <span className="text-destructive">*</span></label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="e.g. MacBook Pro 14"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Serial Number</label>
+              <input
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Auto-generated if empty"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Type</label>
+              <CustomSelect
+                value={type}
+                onChange={(val) => setType(val)}
+                options={[
+                  { value: 'Laptop', label: 'Laptop' },
+                  { value: 'Monitor', label: 'Monitor' },
+                  { value: 'Mobile', label: 'Mobile' },
+                  { value: 'Accessory', label: 'Accessory' },
+                ]}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Assign to employee</label>
+              <CustomSelect
+                value={assigneeId}
+                onChange={(val) => setAssigneeId(val)}
+                placeholder="Select assignee or leave unassigned..."
+                options={[
+                  { value: '', label: 'Unassigned (Available)' },
+                  ...employees.map((employee) => ({ value: employee.id, label: employee.name })),
+                ]}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Device Password / PIN</label>
+              <PasswordInput
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={isEditMode ? 'Optional - enter only to reset credential' : 'Optional - device login credential'}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Notes</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full bg-accent p-2.5 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary/20 resize-none h-20"
+                placeholder="Optional - storage location, condition, etc."
+              />
+            </div>
+            {formError && <p className="text-sm text-destructive">{formError}</p>}
+            <div className="flex gap-3 pt-4">
+              <Button variant="outline" className="flex-1" onClick={resetForm}>Cancel</Button>
+              <Button
+                className="flex-1"
+                onClick={isAddMode ? handleCreate : handleEdit}
+                disabled={createHardwareMutation.isPending || updateHardwareMutation.isPending || !name.trim()}
+              >
+                {createHardwareMutation.isPending || updateHardwareMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                  </>
+                ) : isAddMode ? (
+                  'Create Asset'
+                ) : (
+                  'Update Asset'
+                )}
+              </Button>
+            </div>
           </div>
         ) : selectedAsset ? (
           <div className="space-y-6">
@@ -225,29 +409,20 @@ export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }
               </div>
             )}
 
-            {can('hardware.assign') && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold border-b pb-2">Assignment</h3>
-                <CustomSelect 
-                  value={selectedAsset.assignedToId || ''}
-                  onChange={(val) => {
-                    updateHardware(selectedAsset.id, { 
-                      assignedToId: val || undefined,
-                      status: val ? 'Assigned' : 'Available'
-                    });
-                  }}
-                  options={[
-                    { value: '', label: 'Unassigned (Available)' },
-                    ...employees.map(e => ({ value: e.id, label: e.name }))
-                  ]}
-                />
-              </div>
-            )}
-
             <div className="flex gap-3 pt-4">
               {can('hardware.delete') && (
-                <Button variant="danger" className="flex-1" onClick={() => { deleteHardware(selectedAsset.id); resetForm(); }}>
+                <Button
+                  variant="danger"
+                  className="flex-1"
+                  onClick={() => confirmDelete(selectedAsset)}
+                  disabled={deleteHardwareMutation.isPending}
+                >
                   <Trash2 className="w-4 h-4" /> Delete Asset
+                </Button>
+              )}
+              {can('hardware.edit') && (
+                <Button variant="outline" className="flex-1" onClick={() => openEdit(selectedAsset)}>
+                  Edit
                 </Button>
               )}
               <Button variant="outline" className="flex-1" onClick={resetForm}>Close</Button>
@@ -255,6 +430,49 @@ export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }
           </div>
         ) : null}
       </Modal>
+
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Hardware"
+      >
+        {deleteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-semibold text-foreground">{deleteTarget.name}</span>? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button variant="danger" className="flex-1" onClick={() => void handleDelete()} disabled={deleteHardwareMutation.isPending}>
+                {deleteHardwareMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <div className="fixed bottom-4 right-4 z-70 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`px-4 py-2 rounded-lg text-sm font-medium shadow-lg border ${
+              toast.type === 'success'
+                ? 'bg-emerald-600 text-white border-emerald-700'
+                : 'bg-red-600 text-white border-red-700'
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

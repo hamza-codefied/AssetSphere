@@ -57,7 +57,9 @@ export const Navbar = ({ onMenuClick }: NavbarProps) => {
         </button>
 
         <button
-          onClick={logout}
+          onClick={() => {
+            void logout();
+          }}
           className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-xl text-muted-foreground transition-colors ml-1"
           title="Sign Out"
         >

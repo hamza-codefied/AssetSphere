@@ -3,18 +3,40 @@ import {
   Card, Badge, Button, Modal, CustomSelect, CredentialField, PasswordInput,
   CustomCredentialFieldsEditor, customFieldRowsToStored, type CustomCredentialFieldRow
 } from '../components/ui';
-import { Plus, ExternalLink, Link as LinkIcon, User, Info, Search, Trash2, KeyRound, Calendar, AlertTriangle } from 'lucide-react';
+import { Plus, ExternalLink, Link as LinkIcon, User, Info, Search, Trash2, KeyRound, Calendar, AlertTriangle, Loader2, Pencil } from 'lucide-react';
 import type { SoftwareTool } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
+import { toApiError } from '../api/client';
+import { useAccountsQuery } from '../api/queries/accounts';
+import { useEmployeesQuery } from '../api/queries/employees';
+import {
+  useCreateToolMutation,
+  useDeleteToolMutation,
+  useToolsQuery,
+  useUpdateToolMutation,
+} from '../api/queries/tools';
 
 export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
-  const { tools, accounts, employees, addTool, updateTool, deleteTool } = state;
+  void state;
   const { can } = useAuth();
+  const toolsQuery = useToolsQuery();
+  const employeesQuery = useEmployeesQuery();
+  const accountsQuery = useAccountsQuery();
+  const tools = toolsQuery.data ?? [];
+  const employees = employeesQuery.data ?? [];
+  const accounts = accountsQuery.data ?? [];
+  const createToolMutation = useCreateToolMutation();
+  const updateToolMutation = useUpdateToolMutation();
+  const deleteToolMutation = useDeleteToolMutation();
   const [selectedTool, setSelectedTool] = useState<SoftwareTool | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<SoftwareTool | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Array<{ id: string; type: 'success' | 'error'; message: string }>>([]);
 
   // Form State
   const [name, setName] = useState('');
@@ -24,6 +46,14 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
   const [manualPassword, setManualPassword] = useState('');
   const [manualExtraFields, setManualExtraFields] = useState<CustomCredentialFieldRow[]>([]);
 
+  const pushToast = (type: 'success' | 'error', message: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+    }, 3000);
+  };
+
   const resetForm = () => {
     setName('');
     setLinkedId('');
@@ -31,34 +61,46 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
     setManualEmail('');
     setManualPassword('');
     setManualExtraFields([]);
+    setFormError(null);
     setIsAddMode(false);
+    setIsEditMode(false);
     setIsModalOpen(false);
     setSelectedTool(null);
   };
 
-  const handleAdd = () => {
-    if (!name.trim()) return;
+  const handleAdd = async () => {
+    if (!name.trim()) {
+      setFormError('Tool name is required.');
+      return;
+    }
     const extraStored = customFieldRowsToStored(manualExtraFields);
     const hasManualCreds =
       !linkedId &&
       (manualEmail.trim() || manualPassword.trim() || extraStored.length > 0);
-    addTool({
-      name,
-      status: 'Active',
-      linkedAccountId: linkedId || undefined,
-      assignedToId: assigneeId || undefined,
-      ...(hasManualCreds
-        ? {
-            credentials: {
-              ...(manualEmail.trim() ? { email: manualEmail.trim() } : {}),
-              ...(manualPassword ? { password: manualPassword } : {}),
-              ...(extraStored.length ? { customFields: extraStored } : {}),
-              lastUpdated: new Date().toISOString().split('T')[0]
+    try {
+      await createToolMutation.mutateAsync({
+        name: name.trim(),
+        status: 'Active',
+        linkedAccountId: linkedId || undefined,
+        assignedToId: assigneeId || undefined,
+        ...(hasManualCreds
+          ? {
+              credentials: {
+                ...(manualEmail.trim() ? { email: manualEmail.trim() } : {}),
+                ...(manualPassword ? { password: manualPassword } : {}),
+                ...(extraStored.length ? { customFields: extraStored } : {}),
+                lastUpdated: new Date().toISOString().split('T')[0],
+              },
             }
-          }
-        : {})
-    });
-    resetForm();
+          : {}),
+      });
+      resetForm();
+      pushToast('success', 'Tool created successfully.');
+    } catch (error) {
+      const msg = toApiError(error);
+      setFormError(msg);
+      pushToast('error', msg);
+    }
   };
 
   const getLinkedAccount = (id?: string) => {
@@ -69,6 +111,74 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
     t.name.toLowerCase().includes(searchFilter.toLowerCase())
   );
 
+  const openEdit = (tool: SoftwareTool) => {
+    setSelectedTool(tool);
+    setName(tool.name);
+    setLinkedId(tool.linkedAccountId ?? '');
+    setAssigneeId(tool.assignedToId ?? '');
+    setManualEmail(tool.credentials?.email ?? '');
+    setManualPassword('');
+    setManualExtraFields(
+      (tool.credentials?.customFields ?? []).map((field, index) => ({
+        id: `${field.key}-${index}`,
+        key: field.key,
+        value: '',
+      })),
+    );
+    setFormError(null);
+    setIsAddMode(false);
+    setIsEditMode(true);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = async () => {
+    if (!selectedTool) return;
+    if (!name.trim()) {
+      setFormError('Tool name is required.');
+      return;
+    }
+    const extraStored = customFieldRowsToStored(manualExtraFields);
+    const hasManualCreds = !linkedId && (manualEmail.trim() || manualPassword.trim() || extraStored.length > 0);
+    try {
+      await updateToolMutation.mutateAsync({
+        id: selectedTool.id,
+        payload: {
+          name: name.trim(),
+          linkedAccountId: linkedId || undefined,
+          assignedToId: assigneeId || undefined,
+          ...(hasManualCreds
+            ? {
+                credentials: {
+                  ...(manualEmail.trim() ? { email: manualEmail.trim() } : {}),
+                  ...(manualPassword ? { password: manualPassword } : {}),
+                  ...(extraStored.length ? { customFields: extraStored } : {}),
+                  lastUpdated: new Date().toISOString().split('T')[0],
+                },
+              }
+            : {}),
+        },
+      });
+      resetForm();
+      pushToast('success', 'Tool updated successfully.');
+    } catch (error) {
+      const msg = toApiError(error);
+      setFormError(msg);
+      pushToast('error', msg);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteToolMutation.mutateAsync(deleteTarget.id);
+      if (selectedTool?.id === deleteTarget.id) resetForm();
+      setDeleteTarget(null);
+      pushToast('success', `Tool "${deleteTarget.name}" deleted.`);
+    } catch (error) {
+      pushToast('error', toApiError(error));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -77,7 +187,7 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
           <p className="text-muted-foreground">Manage SaaS subscriptions and platform access.</p>
         </div>
         {can('tools.create') && (
-          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={() => { setIsAddMode(true); setIsModalOpen(true); }}>
+          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={() => { resetForm(); setIsAddMode(true); setIsEditMode(false); setIsModalOpen(true); }}>
             <Plus className="w-4 h-4" />
             Add Tool / Platform
           </Button>
@@ -105,6 +215,7 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
               onClick={() => {
                 setSelectedTool(tool);
                 setIsAddMode(false);
+                setIsEditMode(false);
                 setIsModalOpen(true);
               }}
             >
@@ -185,9 +296,9 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
       <Modal 
         isOpen={isModalOpen} 
         onClose={resetForm} 
-        title={isAddMode ? 'New Software Platform' : 'Tool Configuration'}
+        title={isAddMode ? 'New Software Platform' : isEditMode ? 'Edit Tool' : 'Tool Configuration'}
       >
-        {isAddMode ? (
+        {isAddMode || isEditMode ? (
           <div className="space-y-4">
              <div className="space-y-2">
                 <label className="text-sm font-medium">Platform Name <span className="text-destructive">*</span></label>
@@ -239,8 +350,23 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
 
              <div className="flex gap-3 pt-4">
                <Button variant="outline" className="flex-1" onClick={resetForm}>Cancel</Button>
-               <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleAdd} disabled={!name.trim()}>Add Software</Button>
+               <Button
+                 className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                 onClick={isAddMode ? () => void handleAdd() : () => void handleEdit()}
+                 disabled={!name.trim() || createToolMutation.isPending || updateToolMutation.isPending}
+               >
+                 {createToolMutation.isPending || updateToolMutation.isPending ? (
+                   <>
+                     <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                   </>
+                 ) : isAddMode ? (
+                   'Add Software'
+                 ) : (
+                   'Update Tool'
+                 )}
+               </Button>
              </div>
+             {formError && <p className="text-sm text-destructive">{formError}</p>}
           </div>
         ) : selectedTool ? (
           <div className="space-y-6">
@@ -254,23 +380,13 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
               </div>
             </div>
 
-            {can('tools.link') && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold flex items-center gap-2 text-indigo-600">
-                  <LinkIcon className="w-4 h-4" />
-                  Linked Identity
-                </h3>
-                <CustomSelect 
-                  value={selectedTool.linkedAccountId || ''}
-                  onChange={(val) => updateTool(selectedTool.id, { linkedAccountId: val || undefined })}
-                  placeholder="Manual Credentials"
-                  options={[
-                    { value: '', label: 'No Linking (Manual)' },
-                    ...accounts.map(acc => ({ value: acc.id, label: `${acc.email} (${acc.type})` }))
-                  ]}
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold flex items-center gap-2 text-indigo-600">
+                <LinkIcon className="w-4 h-4" />
+                Linked Identity
+              </h3>
+              <p className="text-sm text-muted-foreground">{getLinkedAccount(selectedTool.linkedAccountId)?.email ?? 'Manual credentials'}</p>
+            </div>
 
             {/* Show inherited credentials if linked */}
             {selectedTool.linkedAccountId && getLinkedAccount(selectedTool.linkedAccountId) && (() => {
@@ -309,24 +425,23 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
               </div>
             )}
 
-            {can('tools.edit') && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Assign Employee
-                </h3>
-                <CustomSelect 
-                  value={selectedTool.assignedToId || ''}
-                  onChange={(val) => updateTool(selectedTool.id, { assignedToId: val })}
-                  options={employees.map(emp => ({ value: emp.id, label: emp.name }))}
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Assigned Employee
+              </h3>
+              <p className="text-sm text-muted-foreground">{employees.find(emp => emp.id === selectedTool.assignedToId)?.name ?? 'Unassigned'}</p>
+            </div>
 
             <div className="flex gap-3 pt-2">
+              {can('tools.edit') && (
+                <Button variant="outline" className="flex-1" onClick={() => openEdit(selectedTool)}>
+                  <Pencil className="w-4 h-4" /> Edit
+                </Button>
+              )}
               <Button variant="outline" className="flex-1" onClick={resetForm}>Close</Button>
               {can('tools.delete') && (
-                <Button variant="danger" className="flex-1" onClick={() => { deleteTool(selectedTool.id); resetForm(); }}>
+                <Button variant="danger" className="flex-1" onClick={() => setDeleteTarget(selectedTool)}>
                    <Trash2 className="w-4 h-4" /> Remove Tool
                 </Button>
               )}
@@ -334,6 +449,45 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
           </div>
         ) : null}
       </Modal>
+
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Tool">
+        {deleteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-semibold text-foreground">{deleteTarget.name}</span>?
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button variant="danger" className="flex-1" onClick={() => void handleDeleteConfirm()} disabled={deleteToolMutation.isPending}>
+                {deleteToolMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <div className="fixed bottom-4 right-4 z-70 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`px-4 py-2 rounded-lg text-sm font-medium shadow-lg border ${
+              toast.type === 'success'
+                ? 'bg-emerald-600 text-white border-emerald-700'
+                : 'bg-red-600 text-white border-red-700'
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

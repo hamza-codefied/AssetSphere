@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { Button, PasswordInput } from '../components/ui';
 import { Shield, AlertCircle } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { roleConfig, mockUsers } from '../auth/permissions';
-import type { UserRole } from '../auth/permissions';
 
 export const Login = () => {
   const { login } = useAuth();
@@ -12,27 +10,15 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
-    // Simulate network delay for realism
-    setTimeout(() => {
-      const result = login(email, password);
-      if (!result.success) {
-        setError(result.error || 'Login failed.');
-      }
-      setIsLoading(false);
-    }, 800);
-  };
-
-  const quickLogin = (role: UserRole) => {
-    const user = mockUsers.find((u) => u.user.role === role);
-    if (user) {
-      setEmail(user.email);
-      setPassword(user.password);
+    const result = await login(email, password);
+    if (!result.success) {
+      setError(result.error || 'Login failed.');
     }
+    setIsLoading(false);
   };
 
   return (
@@ -98,27 +84,6 @@ export const Login = () => {
             <p className="text-muted-foreground mt-2">Sign in to access your workspace.</p>
           </div>
 
-          {/* Quick role selection */}
-          <div className="space-y-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Quick Login</p>
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.keys(roleConfig) as UserRole[]).map((role) => (
-                <button
-                  key={role}
-                  onClick={() => quickLogin(role)}
-                  className="p-3 rounded-xl border hover:border-primary/50 hover:bg-accent/50 transition-all text-center group"
-                >
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border mb-1 ${roleConfig[role].color}`}>
-                    {roleConfig[role].label}
-                  </span>
-                  <p className="text-[10px] text-muted-foreground mt-1 leading-tight hidden sm:block">
-                    {role === 'admin' ? 'Full Access' : role === 'pmo' ? 'Manage & View' : 'View Only'}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
@@ -166,37 +131,10 @@ export const Login = () => {
             </Button>
           </form>
 
-          <div className="pt-5 border-t space-y-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground text-center">Demo Credentials</p>
-            <div className="rounded-xl border overflow-hidden text-xs">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-accent/60">
-                    <th className="px-3 py-2 text-left font-bold text-muted-foreground">Role</th>
-                    <th className="px-3 py-2 text-left font-bold text-muted-foreground">Email</th>
-                    <th className="px-3 py-2 text-left font-bold text-muted-foreground">Password</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  <tr className="hover:bg-accent/30 cursor-pointer transition-colors" onClick={() => quickLogin('admin')}>
-                    <td className="px-3 py-2"><span className="px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-500 border border-rose-500/20 font-bold">Admin</span></td>
-                    <td className="px-3 py-2 font-mono text-foreground/80">admin@assetsphere.com</td>
-                    <td className="px-3 py-2 font-mono text-foreground/80">admin123</td>
-                  </tr>
-                  <tr className="hover:bg-accent/30 cursor-pointer transition-colors" onClick={() => quickLogin('pmo')}>
-                    <td className="px-3 py-2"><span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 border border-amber-500/20 font-bold">PMO</span></td>
-                    <td className="px-3 py-2 font-mono text-foreground/80">pmo@assetsphere.com</td>
-                    <td className="px-3 py-2 font-mono text-foreground/80">pmo123</td>
-                  </tr>
-                  <tr className="hover:bg-accent/30 cursor-pointer transition-colors" onClick={() => quickLogin('dev')}>
-                    <td className="px-3 py-2"><span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-500 border border-blue-500/20 font-bold">Dev</span></td>
-                    <td className="px-3 py-2 font-mono text-foreground/80">dev@assetsphere.com</td>
-                    <td className="px-3 py-2 font-mono text-foreground/80">dev123</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="text-[10px] text-muted-foreground text-center italic">Click any row to auto-fill credentials</p>
+          <div className="pt-5 border-t">
+            <p className="text-xs text-muted-foreground text-center">
+              Use your employee account credentials provided by your administrator.
+            </p>
           </div>
         </div>
       </div>

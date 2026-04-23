@@ -1,10 +1,10 @@
 import type { Employee, HardwareAsset, Account, SoftwareTool, ActivityLog, Subscription, Project } from '../types';
 
 export const employees: Employee[] = [
-  { id: 'emp-1', name: 'Alex Rivers', email: 'alex.rivers@assetsphere.com', role: 'Senior Engineer', status: 'Active', assignedAssetCount: 2, assignedToolCount: 4 },
-  { id: 'emp-2', name: 'Sarah Chen', email: 'sarah.chen@assetsphere.com', role: 'Product Designer', status: 'Active', assignedAssetCount: 1, assignedToolCount: 3 },
-  { id: 'emp-3', name: 'Marcus Bell', email: 'marcus.bell@assetsphere.com', role: 'DevOps Lead', status: 'Active', assignedAssetCount: 3, assignedToolCount: 8 },
-  { id: 'emp-4', name: 'Elena Rodriguez', email: 'elena.r@assetsphere.com', role: 'HR Manager', status: 'Active', assignedAssetCount: 1, assignedToolCount: 2 },
+  { id: 'emp-1', name: 'Alex Rivers', email: 'alex.rivers@assetsphere.com', role: 'dev', department: 'Engineering', status: 'Active', assignedAssetCount: 2, assignedToolCount: 4 },
+  { id: 'emp-2', name: 'Sarah Chen', email: 'sarah.chen@assetsphere.com', role: 'pmo', department: 'Design', status: 'Active', assignedAssetCount: 1, assignedToolCount: 3 },
+  { id: 'emp-3', name: 'Marcus Bell', email: 'marcus.bell@assetsphere.com', role: 'dev', department: 'DevOps', status: 'Active', assignedAssetCount: 3, assignedToolCount: 8 },
+  { id: 'emp-4', name: 'Elena Rodriguez', email: 'elena.r@assetsphere.com', role: 'pmo', department: 'People Ops', status: 'Active', assignedAssetCount: 1, assignedToolCount: 2 },
 ];
 
 export const accounts: Account[] = [
