@@ -949,7 +949,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
           </div>
         </div>
       </Modal>
-      <div className="fixed bottom-4 right-4 z-[120] space-y-2 pointer-events-none">
+      <div className="fixed bottom-4 right-4 z-120 space-y-2 pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
