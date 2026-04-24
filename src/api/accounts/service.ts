@@ -70,3 +70,8 @@ export async function revealAccountCredentials(id: string): Promise<AccountRevea
   const res = await apiClient.get<ApiResponse<AccountRevealedCredentials>>(`/accounts/${id}/reveal`);
   return res.data.data;
 }
+
+export async function setAccountPasswordLock(id: string, locked: boolean): Promise<Account> {
+  const res = await apiClient.patch<ApiResponse<Account>>(`/accounts/${id}/password-lock`, { locked });
+  return res.data.data;
+}

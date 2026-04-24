@@ -8,11 +8,16 @@ import type { SoftwareTool } from '../types';
 import { useSystemState } from '../hooks/useSystemState';
 import { useAuth } from '../auth/AuthContext';
 import { toApiError } from '../api/client';
-import { useAccountsQuery } from '../api/accounts';
+import {
+  useAccountsQuery,
+  useRevealAccountCredentialsMutation,
+  useSetAccountPasswordLockMutation,
+} from '../api/accounts';
 import { useEmployeesQuery } from '../api/employees';
 import {
   useCreateToolMutation,
   useDeleteToolMutation,
+  useSetToolPasswordLockMutation,
   useToolsQuery,
   useUpdateToolMutation,
   useRevealToolCredentialsMutation,
@@ -31,8 +36,17 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
   const updateToolMutation = useUpdateToolMutation();
   const deleteToolMutation = useDeleteToolMutation();
   const revealToolMutation = useRevealToolCredentialsMutation();
+  const setToolPasswordLockMutation = useSetToolPasswordLockMutation();
+  const revealAccountMutation = useRevealAccountCredentialsMutation();
+  const setAccountPasswordLockMutation = useSetAccountPasswordLockMutation();
+  const canReveal = can('vault.reveal_passwords');
+  const canLock = can('vault.lock_passwords');
 
   const [revealedToolCreds, setRevealedToolCreds] = useState<{ password?: string; customFields?: Array<{ key: string; value: string }> } | null>(null);
+  const [revealedLinkedAccountCreds, setRevealedLinkedAccountCreds] = useState<{
+    password?: string;
+    customFields?: Array<{ key: string; value: string }>;
+  } | null>(null);
   const [selectedTool, setSelectedTool] = useState<SoftwareTool | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddMode, setIsAddMode] = useState(false);
@@ -49,6 +63,7 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
   const [manualEmail, setManualEmail] = useState('');
   const [manualPassword, setManualPassword] = useState('');
   const [manualExtraFields, setManualExtraFields] = useState<CustomCredentialFieldRow[]>([]);
+  const [linkedAccountLockState, setLinkedAccountLockState] = useState<Record<string, boolean>>({});
 
   const pushToast = (type: 'success' | 'error', message: string) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -66,6 +81,9 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
     setManualPassword('');
     setManualExtraFields([]);
     setFormError(null);
+    setRevealedToolCreds(null);
+    setRevealedLinkedAccountCreds(null);
+    setLinkedAccountLockState({});
     setIsAddMode(false);
     setIsEditMode(false);
     setIsModalOpen(false);
@@ -219,6 +237,7 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
               onClick={() => {
                 setSelectedTool(tool);
                 setRevealedToolCreds(null);
+                setRevealedLinkedAccountCreds(null);
                 setIsAddMode(false);
                 setIsEditMode(false);
                 setIsModalOpen(true);
@@ -396,6 +415,7 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
             {/* Show inherited credentials if linked */}
             {selectedTool.linkedAccountId && getLinkedAccount(selectedTool.linkedAccountId) && (() => {
               const acc = getLinkedAccount(selectedTool.linkedAccountId)!;
+              const isLinkedLocked = linkedAccountLockState[acc.id] ?? Boolean(acc.credentials.passwordLocked);
               return (
                 <div className="space-y-3">
                   <h3 className="text-sm font-bold flex items-center gap-2 text-emerald-600">
@@ -403,8 +423,39 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
                     Inherited Credentials
                   </h3>
                   <CredentialField label="Email" value={acc.credentials.email || ''} isMasked={false} />
-                  <CredentialField label="Password" value={acc.credentials.password || ''} />
-                  {acc.credentials.customFields?.map((cf, i) => (
+                  <CredentialField
+                    label="Password"
+                    value={revealedLinkedAccountCreds?.password ?? (acc.credentials.password || '')}
+                    onReveal={canReveal && (!isLinkedLocked || canLock) ? async () => {
+                      try {
+                        const revealed = await revealAccountMutation.mutateAsync(acc.id);
+                        setRevealedLinkedAccountCreds(revealed);
+                      } catch (error) {
+                        pushToast('error', toApiError(error));
+                      }
+                    } : undefined}
+                  />
+                  {canLock && (
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const nextLocked = !isLinkedLocked;
+                          await setAccountPasswordLockMutation.mutateAsync({
+                            id: acc.id,
+                            locked: nextLocked,
+                          });
+                          setLinkedAccountLockState((prev) => ({ ...prev, [acc.id]: nextLocked }));
+                          pushToast('success', `Password ${nextLocked ? 'locked' : 'unlocked'} successfully.`);
+                        } catch (error) {
+                          pushToast('error', toApiError(error));
+                        }
+                      }}
+                    >
+                      {isLinkedLocked ? 'Unlock Password' : 'Lock Password'}
+                    </Button>
+                  )}
+                  {(revealedLinkedAccountCreds?.customFields ?? acc.credentials.customFields)?.map((cf, i) => (
                     <CredentialField key={`${cf.key}-${i}`} label={cf.key} value={cf.value} />
                   ))}
                 </div>
@@ -422,23 +473,55 @@ export const Tools = ({ state }: { state: ReturnType<typeof useSystemState> }) =
                   <CredentialField label="Email" value={selectedTool.credentials.email} isMasked={false} />
                 )}
                 {selectedTool.credentials?.password && (
-                  <CredentialField
-                    label="Password"
-                    value={revealedToolCreds?.password ?? selectedTool.credentials.password}
-                    onReveal={can('vault.reveal_passwords') ? async () => {
-                      const revealed = await revealToolMutation.mutateAsync(selectedTool.id);
-                      setRevealedToolCreds(revealed);
-                    } : undefined}
-                  />
+                  <>
+                    <CredentialField
+                      label="Password"
+                      value={revealedToolCreds?.password ?? selectedTool.credentials.password}
+                      onReveal={canReveal && (!selectedTool.credentials?.passwordLocked || canLock) ? async () => {
+                        try {
+                          const revealed = await revealToolMutation.mutateAsync(selectedTool.id);
+                          setRevealedToolCreds(revealed);
+                        } catch (error) {
+                          pushToast('error', toApiError(error));
+                        }
+                      } : undefined}
+                    />
+                    {canLock && (
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            const updated = await setToolPasswordLockMutation.mutateAsync({
+                              id: selectedTool.id,
+                              locked: !selectedTool.credentials?.passwordLocked,
+                            });
+                            setSelectedTool(updated);
+                            pushToast(
+                              'success',
+                              `Password ${updated.credentials?.passwordLocked ? 'locked' : 'unlocked'} successfully.`,
+                            );
+                          } catch (error) {
+                            pushToast('error', toApiError(error));
+                          }
+                        }}
+                      >
+                        {selectedTool.credentials?.passwordLocked ? 'Unlock Password' : 'Lock Password'}
+                      </Button>
+                    )}
+                  </>
                 )}
                 {(revealedToolCreds?.customFields ?? selectedTool.credentials?.customFields)?.map((cf, i) => (
                   <CredentialField
                     key={`${cf.key}-${i}`}
                     label={cf.key}
                     value={cf.value}
-                    onReveal={can('vault.reveal_passwords') && cf.value === '********' ? async () => {
-                      const revealed = await revealToolMutation.mutateAsync(selectedTool.id);
-                      setRevealedToolCreds(revealed);
+                    onReveal={canReveal && (!selectedTool.credentials?.passwordLocked || canLock) && cf.value === '********' ? async () => {
+                      try {
+                        const revealed = await revealToolMutation.mutateAsync(selectedTool.id);
+                        setRevealedToolCreds(revealed);
+                      } catch (error) {
+                        pushToast('error', toApiError(error));
+                      }
                     } : undefined}
                   />
                 ))}

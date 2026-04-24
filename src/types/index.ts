@@ -30,6 +30,7 @@ export interface Credentials {
     /** ISO date when 2FA was enrolled */
     enrolledAt?: string;
   };
+  passwordLocked?: boolean;
   lastUpdated: string;
 }
 
@@ -116,6 +117,7 @@ export interface StandaloneCredential {
   label: string;
   username?: string;
   password?: string;
+  passwordLocked?: boolean;
   url?: string;
   notes?: string;
   customFields?: { key: string; value: string }[];

@@ -15,7 +15,7 @@ export type Permission =
   | 'employees.view' | 'employees.create' | 'employees.edit' | 'employees.deactivate' | 'employees.offboard'
   | 'subscriptions.view' | 'subscriptions.create' | 'subscriptions.edit' | 'subscriptions.delete'
   | 'projects.view' | 'projects.create' | 'projects.edit' | 'projects.delete' | 'projects.manage_members'
-  | 'vault.view' | 'vault.reveal_passwords' | 'vault.copy'
+  | 'vault.view' | 'vault.reveal_passwords' | 'vault.lock_passwords' | 'vault.copy'
   | 'dashboard.view' | 'dashboard.activity'
   | 'guide.view' | 'settings.view';
 
@@ -27,7 +27,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'employees.view', 'employees.create', 'employees.edit', 'employees.deactivate', 'employees.offboard',
     'subscriptions.view', 'subscriptions.create', 'subscriptions.edit', 'subscriptions.delete',
     'projects.view', 'projects.create', 'projects.edit', 'projects.delete', 'projects.manage_members',
-    'vault.view', 'vault.reveal_passwords', 'vault.copy',
+    'vault.view', 'vault.reveal_passwords', 'vault.lock_passwords', 'vault.copy',
     'dashboard.view', 'dashboard.activity',
     'guide.view', 'settings.view',
   ],
@@ -38,7 +38,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'employees.view', 'employees.create', 'employees.edit', 'employees.offboard',
     'subscriptions.view', 'subscriptions.create', 'subscriptions.edit',
     'projects.view', 'projects.create', 'projects.edit', 'projects.manage_members',
-    'vault.view',
+    'vault.view', 'vault.reveal_passwords',
     'dashboard.view', 'dashboard.activity',
     'guide.view',
   ],
@@ -51,6 +51,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'projects.view',
     'dashboard.view',
     'guide.view',
+    'vault.reveal_passwords',
   ],
 };
 

@@ -5,6 +5,7 @@ import {
   getSubscriptions,
   updateSubscription,
   revealSubscriptionCredentials,
+  setSubscriptionPasswordLock,
 } from './service';
 import type { CreateSubscriptionPayload, UpdateSubscriptionPayload } from './service';
 
@@ -49,6 +50,17 @@ export function useDeleteSubscriptionMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteSubscription(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: subscriptionsQueryKey });
+    },
+  });
+}
+
+export function useSetSubscriptionPasswordLockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, locked }: { id: string; locked: boolean }) =>
+      setSubscriptionPasswordLock(id, locked),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionsQueryKey });
     },

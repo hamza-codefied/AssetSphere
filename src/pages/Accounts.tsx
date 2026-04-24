@@ -15,6 +15,7 @@ import {
   useCreateAccountMutation,
   useDeleteAccountMutation,
   useRegenerateBackupCodesMutation,
+  useSetAccountPasswordLockMutation,
   useUpdateAccountMutation,
   useRevealAccountCredentialsMutation,
 } from '../api/accounts';
@@ -64,6 +65,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
   const regenerateCodesMutation = useRegenerateBackupCodesMutation();
   const deleteAccountMutation = useDeleteAccountMutation();
   const revealAccountMutation = useRevealAccountCredentialsMutation();
+  const setAccountPasswordLockMutation = useSetAccountPasswordLockMutation();
 
   const [revealedAccCreds, setRevealedAccCreds] = useState<AccountRevealedCredentials | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -72,6 +74,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [toasts, setToasts] = useState<Array<{ id: string; type: 'success' | 'error'; message: string }>>([]);
 
   // Form State
   const [email, setEmail] = useState('');
@@ -98,6 +101,14 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
   const [editStatus, setEditStatus] = useState<Account['status']>('Active');
   const [editPassword, setEditPassword] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
+
+  const pushToast = (type: 'success' | 'error', message: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+    }, 3000);
+  };
 
   const resetForm = () => {
     setEmail('');
@@ -186,6 +197,7 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
   };
 
   const canReveal = can('vault.reveal_passwords');
+  const canLock = can('vault.lock_passwords');
 
   const handleRegenerateBackupCodes = async (account: Account) => {
     if (!account.credentials.twoFactor) return;
@@ -566,19 +578,65 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                 <CredentialField
                   label="Password"
                   value={revealedAccCreds?.password ?? selectedAccount.credentials.password ?? ''}
-                  onReveal={can('vault.reveal_passwords') ? async () => {
-                    const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
-                    setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                  onReveal={canReveal ? async () => {
+                    if (selectedAccount.credentials.passwordLocked && !canLock) {
+                      pushToast('error', 'Password is locked by admin');
+                      return;
+                    }
+                    try {
+                      const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
+                      setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                    } catch (error) {
+                      pushToast('error', toApiError(error));
+                    }
                   } : undefined}
                 />
+                {selectedAccount.credentials.passwordLocked && !canLock && (
+                  <p className="text-xs text-amber-600">Password is locked by admin.</p>
+                )}
+                {canLock && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const updated = await setAccountPasswordLockMutation.mutateAsync({
+                          id: selectedAccount.id,
+                          locked: !selectedAccount.credentials.passwordLocked,
+                        });
+                        setSelectedAccount(updated);
+                        setFeedback({
+                          type: 'success',
+                          message: `Password ${updated.credentials.passwordLocked ? 'locked' : 'unlocked'} successfully.`,
+                        });
+                        pushToast(
+                          'success',
+                          `Password ${updated.credentials.passwordLocked ? 'locked' : 'unlocked'} successfully.`,
+                        );
+                      } catch (error) {
+                        pushToast('error', toApiError(error));
+                      }
+                    }}
+                    disabled={setAccountPasswordLockMutation.isPending}
+                  >
+                    {selectedAccount.credentials.passwordLocked ? 'Unlock Password' : 'Lock Password'}
+                  </Button>
+                )}
                 {(revealedAccCreds?.customFields ?? selectedAccount.credentials.customFields)?.map((cf, i) => (
                   <CredentialField
                     key={`${cf.key}-${i}`}
                     label={cf.key}
                     value={cf.value}
-                    onReveal={can('vault.reveal_passwords') && cf.value === '********' ? async () => {
-                      const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
-                      setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                    onReveal={canReveal && cf.value === '********' ? async () => {
+                      if (selectedAccount.credentials.passwordLocked && !canLock) {
+                        pushToast('error', 'Password is locked by admin');
+                        return;
+                      }
+                      try {
+                        const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
+                        setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                      } catch (error) {
+                        pushToast('error', toApiError(error));
+                      }
                     } : undefined}
                   />
                 ))}
@@ -625,8 +683,16 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                             label="TOTP Secret"
                             value={revealedAccCreds?.twoFactor?.secret ?? selectedAccount.credentials.twoFactor.secret}
                             onReveal={async () => {
-                              const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
-                              setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                              if (selectedAccount.credentials.passwordLocked && !canLock) {
+                                pushToast('error', 'Password is locked by admin');
+                                return;
+                              }
+                              try {
+                                const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
+                                setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                              } catch (error) {
+                                pushToast('error', toApiError(error));
+                              }
                             }}
                           />
                         ) : (
@@ -667,9 +733,17 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
                             <button
                               type="button"
                               onClick={async () => {
-                                const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
-                                setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
-                                setBackupCodesVisible(true);
+                                if (selectedAccount.credentials.passwordLocked && !canLock) {
+                                  pushToast('error', 'Password is locked by admin');
+                                  return;
+                                }
+                                try {
+                                  const revealed = await revealAccountMutation.mutateAsync(selectedAccount.id);
+                                  setRevealedAccCreds(prev => ({ ...prev, ...revealed }));
+                                  setBackupCodesVisible(true);
+                                } catch (error) {
+                                  pushToast('error', toApiError(error));
+                                }
                               }}
                               disabled={revealAccountMutation.isPending}
                               className="text-[11px] font-semibold text-primary hover:underline disabled:opacity-50"
@@ -875,6 +949,20 @@ export const Accounts = ({ state }: { state: ReturnType<typeof useSystemState> }
           </div>
         </div>
       </Modal>
+      <div className="fixed bottom-4 right-4 z-[120] space-y-2 pointer-events-none">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`px-4 py-2 rounded-lg text-sm font-medium shadow-lg border pointer-events-auto ${
+              toast.type === 'success'
+                ? 'bg-emerald-600 text-white border-emerald-700'
+                : 'bg-red-600 text-white border-red-700'
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

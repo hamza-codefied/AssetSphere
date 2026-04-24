@@ -6,6 +6,7 @@ import {
   getHardware,
   updateHardware,
   revealHardwareCredentials,
+  setHardwarePasswordLock,
 } from './service';
 import type {
   AssignHardwarePayload,
@@ -65,6 +66,17 @@ export function useDeleteHardwareMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteHardware(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: hardwareQueryKey });
+    },
+  });
+}
+
+export function useSetHardwarePasswordLockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, locked }: { id: string; locked: boolean }) =>
+      setHardwarePasswordLock(id, locked),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: hardwareQueryKey });
     },

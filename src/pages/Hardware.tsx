@@ -9,6 +9,7 @@ import {
   useCreateHardwareMutation,
   useDeleteHardwareMutation,
   useHardwareQuery,
+  useSetHardwarePasswordLockMutation,
   useUpdateHardwareMutation,
   useRevealHardwareCredentialsMutation,
 } from '../api/hardware';
@@ -21,7 +22,8 @@ interface ToastMessage {
   message: string;
 }
 
-export const Hardware = ({ state: _state }: { state: ReturnType<typeof useSystemState> }) => {
+export const Hardware = ({ state }: { state: ReturnType<typeof useSystemState> }) => {
+  void state;
   const { can } = useAuth();
   const hardwareQuery = useHardwareQuery();
   const employeesQuery = useEmployeesQuery();
@@ -33,6 +35,9 @@ export const Hardware = ({ state: _state }: { state: ReturnType<typeof useSystem
   const updateHardwareMutation = useUpdateHardwareMutation();
   const deleteHardwareMutation = useDeleteHardwareMutation();
   const revealHardwareMutation = useRevealHardwareCredentialsMutation();
+  const setHardwarePasswordLockMutation = useSetHardwarePasswordLockMutation();
+  const canReveal = can('vault.reveal_passwords');
+  const canLock = can('vault.lock_passwords');
 
   const [revealedHwCreds, setRevealedHwCreds] = useState<{ password?: string; pin?: string } | null>(null);
 
@@ -413,18 +418,48 @@ export const Hardware = ({ state: _state }: { state: ReturnType<typeof useSystem
                 <CredentialField
                   label="Device Password"
                   value={revealedHwCreds?.password ?? selectedAsset.credentials.password}
-                  onReveal={can('vault.reveal_passwords') ? async () => {
-                    const revealed = await revealHardwareMutation.mutateAsync(selectedAsset.id);
-                    setRevealedHwCreds(revealed);
+                  onReveal={canReveal && (!selectedAsset.credentials?.passwordLocked || canLock) ? async () => {
+                    try {
+                      const revealed = await revealHardwareMutation.mutateAsync(selectedAsset.id);
+                      setRevealedHwCreds(revealed);
+                    } catch (error) {
+                      pushToast('error', toApiError(error));
+                    }
                   } : undefined}
                 />
+                {canLock && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const updated = await setHardwarePasswordLockMutation.mutateAsync({
+                          id: selectedAsset.id,
+                          locked: !selectedAsset.credentials?.passwordLocked,
+                        });
+                        setSelectedAsset(updated);
+                        pushToast(
+                          'success',
+                          `Password ${updated.credentials?.passwordLocked ? 'locked' : 'unlocked'} successfully.`,
+                        );
+                      } catch (error) {
+                        pushToast('error', toApiError(error));
+                      }
+                    }}
+                  >
+                    {selectedAsset.credentials?.passwordLocked ? 'Unlock Password' : 'Lock Password'}
+                  </Button>
+                )}
                 {selectedAsset.credentials.pin && (
                   <CredentialField
                     label="PIN"
                     value={revealedHwCreds?.pin ?? selectedAsset.credentials.pin}
-                    onReveal={can('vault.reveal_passwords') ? async () => {
-                      const revealed = await revealHardwareMutation.mutateAsync(selectedAsset.id);
-                      setRevealedHwCreds(revealed);
+                    onReveal={canReveal && (!selectedAsset.credentials?.passwordLocked || canLock) ? async () => {
+                      try {
+                        const revealed = await revealHardwareMutation.mutateAsync(selectedAsset.id);
+                        setRevealedHwCreds(revealed);
+                      } catch (error) {
+                        pushToast('error', toApiError(error));
+                      }
                     } : undefined}
                   />
                 )}

@@ -13,6 +13,7 @@ import { useEmployeesQuery } from '../api/employees';
 import {
   useCreateSubscriptionMutation,
   useDeleteSubscriptionMutation,
+  useSetSubscriptionPasswordLockMutation,
   useSubscriptionsQuery,
   useUpdateSubscriptionMutation,
   useRevealSubscriptionCredentialsMutation,
@@ -52,6 +53,9 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
   const updateSubscriptionMutation = useUpdateSubscriptionMutation();
   const deleteSubscriptionMutation = useDeleteSubscriptionMutation();
   const revealSubMutation = useRevealSubscriptionCredentialsMutation();
+  const setSubscriptionPasswordLockMutation = useSetSubscriptionPasswordLockMutation();
+  const canReveal = can('vault.reveal_passwords');
+  const canLock = can('vault.lock_passwords');
 
   const [revealedSubPassword, setRevealedSubPassword] = useState<string | null>(null);
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
@@ -59,6 +63,7 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
   const [isAddMode, setIsAddMode] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [toasts, setToasts] = useState<Array<{ id: string; type: 'success' | 'error'; message: string }>>([]);
 
   // Form state
   const [fName, setFName] = useState('');
@@ -84,6 +89,14 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
     setFLinkedAccountId(''); setFCredEmail(''); setFCredPassword('');
     setFLicenseCount(''); setFNotes('');
     setIsAddMode(false); setIsModalOpen(false); setSelectedSub(null);
+  };
+
+  const pushToast = (type: 'success' | 'error', message: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+    }, 3000);
   };
 
   const computeStatus = (renewalDate: string): SubscriptionStatus => {
@@ -542,11 +555,37 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
                 <CredentialField
                   label="Password"
                   value={revealedSubPassword ?? selectedSub.credentials.password}
-                  onReveal={can('vault.reveal_passwords') ? async () => {
-                    const revealed = await revealSubMutation.mutateAsync(selectedSub.id);
-                    if (revealed.password) setRevealedSubPassword(revealed.password);
+                  onReveal={canReveal && (!selectedSub.credentials?.passwordLocked || canLock) ? async () => {
+                    try {
+                      const revealed = await revealSubMutation.mutateAsync(selectedSub.id);
+                      if (revealed.password) setRevealedSubPassword(revealed.password);
+                    } catch (error) {
+                      pushToast('error', toApiError(error));
+                    }
                   } : undefined}
                 />
+                {canLock && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const updated = await setSubscriptionPasswordLockMutation.mutateAsync({
+                          id: selectedSub.id,
+                          locked: !selectedSub.credentials?.passwordLocked,
+                        });
+                        setSelectedSub(updated);
+                        pushToast(
+                          'success',
+                          `Password ${updated.credentials?.passwordLocked ? 'locked' : 'unlocked'} successfully.`,
+                        );
+                      } catch (error) {
+                        pushToast('error', toApiError(error));
+                      }
+                    }}
+                  >
+                    {selectedSub.credentials?.passwordLocked ? 'Unlock Password' : 'Lock Password'}
+                  </Button>
+                )}
               </div>
             )}
 
@@ -597,6 +636,20 @@ export const Subscriptions = ({ state }: { state: ReturnType<typeof useSystemSta
           </div>
         ) : null}
       </Modal>
+      <div className="fixed bottom-4 right-4 z-70 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`px-4 py-2 rounded-lg text-sm font-medium shadow-lg border ${
+              toast.type === 'success'
+                ? 'bg-emerald-600 text-white border-emerald-700'
+                : 'bg-red-600 text-white border-red-700'
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

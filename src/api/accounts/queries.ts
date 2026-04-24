@@ -6,6 +6,7 @@ import {
   regenerateBackupCodes,
   updateAccount,
   revealAccountCredentials,
+  setAccountPasswordLock,
 } from './service';
 import type { CreateAccountPayload, UpdateAccountPayload } from './service';
 
@@ -60,6 +61,17 @@ export function useDeleteAccountMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteAccount(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: accountsQueryKey });
+    },
+  });
+}
+
+export function useSetAccountPasswordLockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, locked }: { id: string; locked: boolean }) =>
+      setAccountPasswordLock(id, locked),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: accountsQueryKey });
     },

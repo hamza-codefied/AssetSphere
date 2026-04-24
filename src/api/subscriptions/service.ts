@@ -62,3 +62,8 @@ export async function revealSubscriptionCredentials(id: string): Promise<Subscri
   const res = await apiClient.get<ApiResponse<SubscriptionRevealedCredentials>>(`/subscriptions/${id}/reveal`);
   return res.data.data;
 }
+
+export async function setSubscriptionPasswordLock(id: string, locked: boolean): Promise<Subscription> {
+  const res = await apiClient.patch<ApiResponse<Subscription>>(`/subscriptions/${id}/password-lock`, { locked });
+  return res.data.data;
+}

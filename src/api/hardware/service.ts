@@ -72,3 +72,8 @@ export async function revealHardwareCredentials(id: string): Promise<HardwareRev
   const res = await apiClient.get<ApiResponse<HardwareRevealedCredentials>>(`/hardware/${id}/reveal`);
   return res.data.data;
 }
+
+export async function setHardwarePasswordLock(id: string, locked: boolean): Promise<HardwareAsset> {
+  const res = await apiClient.patch<ApiResponse<HardwareAsset>>(`/hardware/${id}/password-lock`, { locked });
+  return res.data.data;
+}

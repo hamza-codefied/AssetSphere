@@ -61,3 +61,8 @@ export async function revealToolCredentials(id: string): Promise<ToolRevealedCre
   const res = await apiClient.get<ApiResponse<ToolRevealedCredentials>>(`/tools/${id}/reveal`);
   return res.data.data;
 }
+
+export async function setToolPasswordLock(id: string, locked: boolean): Promise<SoftwareTool> {
+  const res = await apiClient.patch<ApiResponse<SoftwareTool>>(`/tools/${id}/password-lock`, { locked });
+  return res.data.data;
+}

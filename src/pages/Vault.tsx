@@ -55,6 +55,7 @@ export const Vault = ({
   >([]);
 
   const canReveal = can("vault.reveal_passwords");
+  const canLock = can("vault.lock_passwords");
 
   const pushToast = (type: "success" | "error", message: string) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -417,6 +418,7 @@ export const Vault = ({
                         }
                       />
                       {isEncryptedValue(item.creds.password) &&
+                        (!item.creds.passwordLocked || canLock) &&
                         !revealedValues[item.id] && (
                           <Button
                             variant="outline"
@@ -448,6 +450,11 @@ export const Vault = ({
                               : "Reveal Password"}
                           </Button>
                         )}
+                      {Boolean(item.creds.passwordLocked) && !canLock && (
+                        <p className="text-xs text-amber-600">
+                          This password is locked by admin.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-1.5">
